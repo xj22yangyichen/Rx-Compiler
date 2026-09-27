@@ -1,0 +1,21 @@
+# Rust
+/target
+
+# REIMU build configuration
+/.xmake/
+
+# ANTLR
+.antlr
+
+# Python test runner
+__pycache__/
+
+# Local files
+dev/
+*.local.*
+
+# hidden files
+.claude/
+.xmake/
+.idea/
+.vscode/
