@@ -1,0 +1,23 @@
+[book]
+title = "Rx 编译器规范"
+authors = ["编译器课程教学团队"]
+language = "zh-CN"
+
+[output.html]
+additional-css = ["theme/reference.css"]
+additional-js = ["theme/reference.js"]
+git-repository-url = "https://github.com/ACMClassCourse-2025/rx-compiler-specification"
+site-url = "/rx-compiler-specification/"
+smart-punctuation = true
+
+[output.html.search.chapter]
+"grammar-summary.md" = { enable = false }
+
+[rust]
+edition = "2021"
+
+[preprocessor.spec]
+command = "cargo run --release --manifest-path mdbook-spec/Cargo.toml"
+
+[build]
+extra-watch-dirs = ["mdbook-spec/src"]

@@ -19,3 +19,4 @@ dev/
 .xmake/
 .idea/
 .vscode/
+.cc-history/
