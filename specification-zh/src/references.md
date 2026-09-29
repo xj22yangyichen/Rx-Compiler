@@ -1,8 +1,8 @@
-# References and storage duration
+# 引用与存储期
 
-## Reference annotations
+## 引用标注
 
-[Reference types](types/pointer.md) specify a referent type, mutability, and an optional lifetime. They may appear in struct fields, array element types, function parameter and return types, and generic container type arguments.
+[引用类型](types/pointer.md)指定被引用类型、可变性和可选生命周期。它们可以出现在结构体字段、数组元素类型、函数参数和返回类型以及泛型容器类型实参中。
 
 ```rust,ignore
 struct View<'a> { value: &'a i32 }
@@ -12,21 +12,23 @@ fn choose<'a>(a: &'a i32, b: &'a i32, first: bool) -> &'a i32 {
 }
 ```
 
-## Lifetime validity
+<a id="lifetime-validity"></a>
+## 生命周期有效性
 
-Declarations, annotations, arguments, bounds, and elision follow Rust 2021's [generic parameter](https://doc.rust-lang.org/reference/items/generics.html) and [lifetime elision](https://doc.rust-lang.org/reference/lifetime-elision.html) rules for supported constructs. Invalid lifetime usage is undefined behavior under the [lifetime validity guarantee](undefined-behavior.md#lifetime-validity) (i.e., tests are guaranteed to be lifetime-valid, and the compiler is not required to diagnose lifetime errors).
+对于受支持的构造，声明、标注、实参、约束和省略遵循 Rust 2021 的[泛型参数](https://doc.rust-lang.org/reference/items/generics.html)和[生命周期省略](https://doc.rust-lang.org/reference/lifetime-elision.html)规则。根据[生命周期有效性保证](undefined-behavior.md#lifetime-validity)，无效的生命周期使用属于未定义行为（也就是说，测试保证生命周期有效，编译器无需诊断生命周期错误）。
 
-The compiler may [discard lifetime syntax after parsing](grammar.md#syntax-that-may-be-discarded-after-parsing); it need not implement lifetime checking or inference. Reference types, their mutability, and their referents remain part of the program's semantics.
+编译器可以[在解析后丢弃生命周期语法](grammar.md#syntax-that-may-be-discarded-after-parsing)；无需实现生命周期检查或推断。引用类型、引用的可变性及其被引用对象仍属于程序语义。
 
-Each elided lifetime in a function's parameter list is assigned a distinct lifetime parameter. If exactly one input lifetime exists (elided or explicit), that lifetime is assigned to all elided output lifetimes. If there are multiple input lifetimes but one belongs to a reference receiver (`&self` or `&mut self`), that receiver's lifetime is assigned to all elided output lifetimes. Any other function signature with elided output lifetimes is ambiguous and requires explicit annotations. The placeholder lifetime `'_` is accepted where permitted by Rust 2021 elision rules.
+函数参数列表中的每个省略生命周期都会被分配一个不同的生命周期参数。如果恰好存在一个输入生命周期（省略的或显式的），则所有省略的输出生命周期都分配该生命周期。如果存在多个输入生命周期，但其中一个属于引用接收者（`&self` 或 `&mut self`），则所有省略的输出生命周期都分配该接收者的生命周期。其他带有省略输出生命周期的函数签名都是有歧义的，需要显式标注。在 Rust 2021 省略规则允许的位置接受占位生命周期 `'_`。
 
-Correct annotations describe validity; they never extend the storage duration of a local, temporary, or heap object.
+正确的标注描述有效性；它们绝不会延长局部变量、临时值或堆对象的存储期。
 
-## Borrowing rules
+<a id="borrowing-rules"></a>
+## 借用规则
 
-Ordinary type and mutability checks are required: mutable borrows require mutable places, shared references cannot be reborrowed mutably, and writes through shared references must be rejected. Borrow dataflow analysis is not required because tests guarantee actual borrowing and ownership validity.
+必须执行普通的类型和可变性检查：可变借用要求可变位置，共享引用不能被重新可变借用，通过共享引用进行的写入必须拒绝。不要求借用数据流分析，因为测试保证实际借用和所有权有效。
 
-Valid programs may use multiple shared references, disjoint mutable references, and reborrows with shorter lifetimes. A parent mutable reference becomes usable again once its reborrow expires. Passing a mutable reference to an `&mut` parameter implicitly reborrows the referent.
+有效程序可以使用多个共享引用、互不重叠的可变引用以及生命周期更短的重借用。父可变引用的重借用结束后，父引用会再次可用。将可变引用传给 `&mut` 参数会隐式重借用被引用对象。
 
 ```rust,ignore
 let mut x = 10;
@@ -38,30 +40,31 @@ let r = &mut x;
 *r = 30;                        // parent reference is usable again
 ```
 
-References need no runtime lifetime markers, reference counts, or ownership checks. Optimizations must still respect aliasing and reborrowing; distinct reference values need not denote distinct addresses.
+引用不需要运行时生命周期标记、引用计数或所有权检查。优化仍必须遵守别名和重借用规则；不同的引用值不必表示不同的地址。
 
-## Storage and implementation
+<a id="storage-and-implementation"></a>
+## 存储与实现
 
-Supported Rust 2021 local and temporary scopes define source validity. A local remains valid until its scope ends unless moved or otherwise invalidated. Shadowing creates a new binding without ending the old value's storage duration. Statement temporaries normally last through the statement, and eligible `let` initializers receive Rust's temporary-lifetime extension.
+受支持的 Rust 2021 局部作用域和临时作用域定义源代码有效性。局部变量通常保持有效直到其作用域结束，除非被移动或以其他方式失效。遮蔽会创建新绑定，但不会结束旧值的存储期。语句临时值通常持续到语句结束，符合条件的 `let` 初始化器会获得 Rust 的临时值生命周期延长。
 
-A conforming baseline may allocate fixed stack storage per call and retain it until return. Recursive calls require independent stack frames, whereas stack storage for variables within a loop body does not need to accumulate across iterations (i.e., slot storage may be reused across iterations). Implementations may promote values, reuse slots, or eliminate storage whenever observable behavior and valid references are preserved.
+符合规范的基线实现可以为每次调用分配固定的栈存储，并保留到返回。递归调用要求使用独立的栈帧，而循环体内变量的栈存储不必跨迭代累积（也就是说，可以跨迭代复用槽位存储）。只要保留可观察行为和有效引用，实现就可以提升值、复用槽位或消除存储。
 
-Retaining bytes does not make a dangling source reference valid. Constant promotion is optional, and tests do not return references to promoted literals or other program-lifetime temporaries.
+保留字节不会使源代码中的悬空引用有效。常量提升是可选的，测试不会返回指向被提升字面量或其他具有程序生命周期的临时值的引用。
 
 <details>
-<summary>Excluded reference executions</summary>
+<summary>被排除的引用执行</summary>
 
-Tests never:
+测试不会：
 
-- Use a reference after its target expires, moves in an invalidating way, is freed, or is reallocated.
-- Return and use a reference to a callee local or insufficiently long-lived temporary.
-- Access overlapping storage through conflicting active shared and mutable borrows.
-- Use a parent mutable reference while a conflicting child reborrow is active.
-- Move non-`Copy` data from borrowed contents or reuse a moved mutable reference.
-- Reference uninitialized, misaligned, incorrectly typed, or otherwise invalid data.
+- 在目标过期、以使其失效的方式移动、释放或重新分配后继续使用引用。
+- 返回并使用指向被调用函数局部变量或生命周期不足的临时值的引用。
+- 通过相互冲突的活动共享借用和可变借用访问重叠存储。
+- 在冲突的子重借用活动期间使用父可变引用。
+- 从借用内容中移动非 `Copy` 数据，或重新使用已移动的可变引用。
+- 引用未初始化、未对齐、类型错误或其他无效的数据。
 
-Shared references may alias, and disjoint mutable borrows remain valid. Container and array accesses performed using runtime indices must also satisfy these borrow exclusivity rules.
+共享引用可以存在别名，互不重叠的可变借用仍然有效。使用运行时索引执行的容器和数组访问也必须满足这些借用排他性规则。
 
 </details>
 
-Container-specific invalidation follows the [Box and Vec storage rules](heap.md#storage-and-references). Omitting heap deallocation (leaking heap storage) does not extend source-level reference validity.
+容器特有的失效规则遵循 [Box 与 Vec 存储规则](heap.md#storage-and-references)。省略堆释放（泄漏堆存储）不会延长源代码层面的引用有效性。

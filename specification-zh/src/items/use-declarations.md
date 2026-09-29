@@ -1,5 +1,5 @@
 <a id="use-declarations"></a>
-# Use 声明
+# `use` 声明
 
 ```grammar,items
 UseDeclaration -> `use` UseTree `;`

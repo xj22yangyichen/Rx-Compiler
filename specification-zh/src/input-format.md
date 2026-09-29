@@ -1,5 +1,5 @@
-# Input format
+# 输入格式
 
-A source compilation unit is a single file containing 7-bit ASCII source text. LF and CRLF line endings are supported. Unicode identifiers, byte-order marks, and interpreter directives are excluded from the Rx language subset.
+一个源代码编译单元是包含 7 位 ASCII 源文本的单个文件。支持 LF 和 CRLF 行尾。Unicode 标识符、字节顺序标记和解释器指令不属于 Rx 语言子集。
 
-[Whitespace](whitespace.md) and [comments](comments.md) separate tokens. The parser consumes the resulting sequence of tokens according to the [Crate] production.
+[空白字符](whitespace.md)和[注释](comments.md)用于分隔词法单元。解析器根据 [Crate] 产生式处理由此得到的词法单元序列。

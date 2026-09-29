@@ -1,32 +1,32 @@
-# Rx Compiler Specification
+# Rx 编译器规范
 
-Welcome to the Rx Compiler course! In this course, you are required to write a compiler for a subset of [Rust](https://www.rust-lang.org/) we call *Rx*. The compiler will target the [RV32IM](https://en.wikipedia.org/wiki/RISC-V) instruction set architecture. To simplify frontend development, we provide an [ANTLR v4](https://www.antlr.org/) grammar for Rx that automates parsing, allowing you to begin directly with an Abstract Syntax Tree (AST).
+欢迎来到 Rx 编译器课程！在本课程中，你需要为 [Rust](https://www.rust-lang.org/) 的一个子集编写编译器，我们将这个子集称为 *Rx*。编译器的目标是 [RV32IM](https://en.wikipedia.org/wiki/RISC-V) 指令集架构。为简化前端开发，我们提供了 Rx 的 [ANTLR v4](https://www.antlr.org/) 语法，这会自动完成解析，使你可以直接从抽象语法树（AST）开始工作。
 
-The compiler must use LLVM IR as its intermediate representation and support emitting it as text. This lets you validate the frontend using Clang before implementing your own RISC-V backend, as described in [Backend](backend.md#llvm-ir-and-code-generation).
+编译器必须使用 LLVM IR 作为中间表示，并支持将其输出为文本。这使你可以在实现自己的 RISC-V 后端之前，使用 Clang 验证前端，具体方法见[后端](backend.md#llvm-ir-and-code-generation)。
 
-For Rust compatibility, the parser also accepts top-level `use` declarations and lifetime syntax. You may [discard both after parsing](grammar.md#syntax-that-may-be-discarded-after-parsing); import resolution and lifetime checking are not part of the assignment.
+为兼容 Rust，解析器还接受顶层 `use` 声明和生命周期语法。你可以[在解析后丢弃这两者](grammar.md#syntax-that-may-be-discarded-after-parsing)；导入解析和生命周期检查不属于本课程作业。
 
-This book rigorously defines the syntax and semantics of Rx and, alongside the official Rust compiler (`rustc`), serves as the source of truth for this course. If you find any ambiguities or disagreements between the two, do not hesitate to reach out to your TA for clarification.
+本书严格定义 Rx 的语法和语义，并与官方 Rust 编译器（`rustc`）一起作为本课程的依据。如果你发现两者之间存在歧义或不一致，请及时向助教寻求澄清。
 
-## How to read the specification
+## 如何阅读规范
 
-Start by reading [Language scope and test guarantees](undefined-behavior.md), which distinguishes valid programs, compile errors, and excluded cases (i.e., *undefined behavior*) to understand which features are required and which are out of scope.
+请先阅读[语言范围与测试保证](undefined-behavior.md)，其中区分了有效程序、编译错误和排除的情况（即*未定义行为*），帮助你了解哪些功能是必需的，哪些超出范围。
 
-Next, proceed to [lexical structure](lexical-structure.md), followed by [items](items.md), [types](types.md), and [expressions](expressions.md). These sections define the complete grammar of the Rx language. There is a quick lookup table in the [grammar summary](grammar-summary.md) section.
+接下来阅读[词法结构](lexical-structure.md)，然后依次阅读[条目](items.md)、[类型](types.md)和[表达式](expressions.md)。这些章节定义 Rx 语言的完整语法。[语法汇总](grammar-summary.md)一节提供了便于快速查阅的表格。
 
-While reading, we recommend experimenting with the Rust compiler (`rustc`). You can also use online environments such as the [Rust Playground](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024) or [Compiler Explorer](https://godbolt.org/) to see what compiles and what does not. Note that we **do not treat compiler warnings as compile errors**.
+阅读时，我们建议使用 Rust 编译器（`rustc`）进行实验。你也可以使用 [Rust Playground](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024) 或 [Compiler Explorer](https://godbolt.org/) 等在线环境，观察哪些代码可以编译、哪些不可以。请注意，我们**不将编译器警告视为编译错误**。
 
-## How to get started
+## 如何开始
 
-Before beginning, we recommend reviewing an introductory Rust tutorial. You do not need an exhaustive understanding because Rx implements only a subset, but familiarity with basic Rust syntax is essential.
+开始之前，建议先复习 Rust 入门教程。由于 Rx 只实现 Rust 的一个子集，你不需要全面掌握 Rust，但熟悉基本 Rust 语法是必需的。
 
-Many excellent online resources explain the various phases of compiler construction. Some blogs from your TAs (or their TAs) include:
+网上有许多优秀资料介绍编译器构造的不同阶段。以下是一些由你的助教（或他们的助教）撰写的博客：
 
-- [Compiler for Mx* 编译器随笔](https://darksharpness.top/CompilerMx/) by legendary TA [@darksharpness](https://darksharpness.top/): A classic blog post that focuses heavily on various optimization techniques in Mx (the course language used prior to Rx).
-- [Writing a Compiler for Rust](https://norb.space/blog/writing-a-compiler-for-rust) by RayZh (co-designer of this specification): Focuses primarily on the end-to-end compiler pipeline. Note that certain techniques discussed are no longer needed or applicable due to updates in this year's specification.
+- [Compiler for Mx* 编译器随笔](https://darksharpness.top/CompilerMx/)：传奇助教 [@darksharpness](https://darksharpness.top/) 的博客文章，重点介绍 Mx（Rx 之前使用的课程语言）中的各种优化技术。
+- [Writing a Compiler for Rust](https://norb.space/blog/writing-a-compiler-for-rust)：由本规范共同设计者 RayZh 撰写，主要介绍端到端的编译器流水线。请注意，由于今年规范有所更新，其中讨论的一些技术已不再需要或不再适用。
 
-Additional information:
+更多资料：
 
-- [Compiler 101](https://github.com/ACMClassCourses/Compiler-101): A collection of projects and notes by ACM Class students over the years. Note that many of the techniques described are specific to Mx and may not apply to Rx.
-- [The Rust Reference](https://doc.rust-lang.org/reference/): The official, comprehensive reference for the Rust language. While this Rx specification is intended to be self-contained, the Rust Reference is an authoritative supplementary guide to standard Rust semantics.
-- [Rust Compiler Development Guide](https://rustc-dev-guide.rust-lang.org/): An advanced, in-depth guide to `rustc` internals and architecture, recommended as a background reference for compiler engineering patterns.
+- [Compiler 101](https://github.com/ACMClassCourses/Compiler-101)：ACM Class 学生多年来积累的项目和笔记集合。请注意，所述技术中有许多针对 Mx，可能不适用于 Rx。
+- [The Rust Reference](https://doc.rust-lang.org/reference/)：Rust 语言的官方完整参考。尽管本 Rx 规范力求自洽，《Rust 参考手册》仍是标准 Rust 语义的权威补充指南。
+- [Rust Compiler Development Guide](https://rustc-dev-guide.rust-lang.org/)：深入介绍 `rustc` 内部实现和架构的高级指南，适合作为编译器工程模式的背景参考。

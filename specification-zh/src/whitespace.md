@@ -1,10 +1,10 @@
 r[lex.whitespace]
-# Whitespace
+# 空白字符
 
 ```grammar,lexer
 @root WHITESPACE -> ( SPACE | TAB | LF | CR LF )+
 ```
 
-Whitespace separators are space, horizontal tab, LF, and CRLF.
+空白分隔符包括空格、水平制表符、LF 和 CRLF。
 
-Whitespace separates tokens and otherwise has no semantic significance. Replacing a whitespace separator with another supported separator preserves the token sequence. [Comments](comments.md) also act as separators. Whitespace cannot be inserted inside an identifier, inside an integer token, or between the two characters of a comment delimiter (such as `//` or `/*`).
+空白字符用于分隔词法单元，除此之外没有语义意义。将一种空白分隔符替换为另一种受支持的分隔符不会改变词法单元序列。[注释](comments.md)也起分隔符作用。不能在标识符内部、整数字面量内部，或注释分隔符的两个字符之间插入空白字符，例如 `//` 或 `/*`。

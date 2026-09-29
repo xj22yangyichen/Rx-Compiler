@@ -1,4 +1,4 @@
-# Expressions and evaluation
+# 表达式与求值
 
 ```grammar,expressions
 Expression -> ExpressionWithoutBlock | ExpressionWithBlock
@@ -25,26 +25,25 @@ ExpressionWithBlock ->
     | IfExpression
 ```
 
-Expressions form integer, boolean, and unit values; resolve names and associated paths; construct Box/Vec values, arrays, and named-field structs; access fields and indexed elements; call functions and methods; apply operators; and control execution through blocks, if/while/loop, and return/break/continue. Parentheses group expressions. Heap operations are specified in [Box and Vec](heap.md).
+表达式可以产生整数、布尔值和单元值；解析名称和关联路径；构造 Box/Vec 值、数组和具名字段结构体；访问字段和索引元素；调用函数和方法；应用运算符；并通过块、if/while/loop 以及 return/break/continue 控制执行。括号用于对表达式分组。堆操作在 [Box 与 Vec](heap.md) 中规定。
 
-## Evaluation order
+<a id="evaluation-order"></a>
+## 求值顺序
 
-Ordinary operands evaluate left to right before the enclosing operation. This includes call arguments, array elements, struct field initializers, comparisons, arithmetic, and indexing. Struct fields evaluate in source order rather than declaration or layout order.
+普通操作数在外层操作之前从左到右求值。这包括调用实参、数组元素、结构体字段初始化器、比较、算术运算和索引。结构体字段按源代码顺序求值，而不是按声明或布局顺序求值。
 
-Specialized rules for [assignment](expressions/operator-expr.md#evaluation-order), [short-circuit logic](expressions/operator-expr.md#comparison-and-logic), [array repetition](expressions/array-expr.md#array-expressions), and control flow specify which operands are evaluated and in what order.
+[赋值](expressions/operator-expr.md#evaluation-order)、[短路逻辑](expressions/operator-expr.md#comparison-and-logic)、[数组重复](expressions/array-expr.md#array-expressions)和控制流的专门规则规定哪些操作数会被求值以及求值顺序。
 
-Optimizations must preserve observable effects, including I/O and writes through references.
+优化必须保留可观察效果，包括 I/O 和通过引用进行的写入。
 
-## Places and values
+<a id="places-and-values"></a>
+## 位置与值
 
-A place denotes storage: a variable, dereference, field, indexed array or `Vec` element, or parenthesized place. Reading a place copies or moves its value according to its type. Assignment requires a mutable place, and borrowing evaluates to a reference containing the place's address.
+位置表示存储：变量、解引用结果、字段、按索引访问的数组或 `Vec` 元素，或带括号的位置。读取位置时，根据其类型复制或移动其中的值。赋值要求可变位置，而借用的结果是包含该位置地址的引用。
 
-A mutable local can be assigned. Dereferencing `&mut T` yields a mutable place
-unless reached through a shared reference; dereferencing `&T` does not.
+可变局部变量可以被赋值。解引用 `&mut T` 会产生可变位置，除非该解引用是通过共享引用到达的；解引用 `&T` 不会产生可变位置。
 
-The following blocks are independent examples. A binding declared without
-`mut` can hold an `&mut T` and modify its target, but cannot be redirected to
-another target:
+下面的代码块是相互独立的示例。不带 `mut` 声明的绑定可以保存 `&mut T` 并修改其目标，但不能被重定向到另一个目标：
 
 ```rust,ignore
 let mut x = 1;
@@ -54,7 +53,7 @@ let p = &mut x;
 p = &mut y;    // compile error: p is not a mutable binding
 ```
 
-Making the binding mutable permits both operations:
+使绑定可变后，两种操作都允许：
 
 ```rust,ignore
 let mut x = 1;
@@ -65,8 +64,7 @@ p = &mut y;    // valid: redirects p to y
 *p = 4;        // valid: changes y
 ```
 
-A shared reference does not permit modifying its target, even if that target
-was declared mutable:
+共享引用不允许修改其目标，即使该目标声明为可变：
 
 ```rust,ignore
 let mut x = 1;
@@ -74,7 +72,7 @@ let p = &x;
 *p = 2;        // compile error: p gives shared access to x
 ```
 
-Additionally, mutable access cannot be recovered through a shared reference to an `&mut T`:
+此外，不能通过指向 `&mut T` 的共享引用恢复可变访问：
 
 ```rust,ignore
 let mut x = 1;
@@ -83,22 +81,14 @@ let shared = &p;
 **shared = 2;  // compile error: reaching x crosses the shared reference
 ```
 
-### Temporary places
+<a id="temporary-places"></a>
+### 临时位置
 
-A local variable such as `values` names existing storage. A value expression such as
-`make_array()` produces a value without naming a storage location. When an
-operation needs a place for that value, the value is held in temporary storage.
-This is called *materializing a temporary*. It applies to field and index
-bases, explicitly borrowed values, and method receivers that need a borrow.
+`values` 这样的局部变量命名已有的存储。`make_array()` 这样的值表达式产生一个值，但不命名存储位置。当某个操作需要该值的位置时，该值会保存在临时存储中。这称为*临时值实体化*，适用于字段和索引的基表达式、显式借用的值以及需要借用的方法接收者。
 
-The value expression is evaluated once each time the enclosing expression is
-evaluated. That result is used for the field, element, borrow, or method call;
-obtaining its address must not evaluate it again. For example, indexing
-`make_array()[0]` calls `make_array()` once, and any side effects of that call
-occur once.
+每次外层表达式求值时，值表达式只求值一次。字段、元素、借用或方法调用使用该次求值结果；获取其地址不得再次对它求值。例如，索引 `make_array()[0]` 只调用一次 `make_array()`，该调用的任何副作用也只发生一次。
 
-A temporary can be used mutably without a named `let mut` binding. With a
-function `make_array() -> [i32; 2]`, these operations are valid:
+临时值无需命名的 `let mut` 绑定也可以被可变地使用。对于函数 `make_array() -> [i32; 2]`，以下操作有效：
 
 ```rust,ignore
 make_array()[0] = 7;          // writes an element of the temporary array
@@ -107,19 +97,12 @@ let p = &mut 3;              // borrows a temporary integer
 *p = 4;                     // modifies that integer
 ```
 
-The same rule permits `make().field = value` for any returned struct containing that field.
-Existing places still follow their own mutability rules: using an immutable
-local or a shared reference as a base does not create a mutable copy of it.
-Assignment still requires a place expression; `1 = 2` and `1 += 2` are invalid.
-Blocks produce values with the ordinary copy/move semantics.
+对于任何包含该字段的返回结构体，同一规则也允许 `make().field = value`。已有位置仍遵循各自的可变性规则：以不可变局部变量或共享引用为基表达式不会为它创建可变副本。赋值仍要求位置表达式；`1 = 2` 和 `1 += 2` 无效。块按照普通复制/移动语义产生值。
 
 <details>
-<summary>Temporary lifetime (optional background)</summary>
+<summary>临时值生命周期（可选背景知识）</summary>
 
-A temporary normally remains valid through its
-containing statement. Certain `let` initializers extend its storage duration
-to the end of the enclosing block. In this example, the explicit borrow in the initializer
-extends the lifetime of the returned array:
+临时值通常在包含它的语句结束前保持有效。某些 `let` 初始化器会将其存储期延长到外层块结束。在下面的示例中，初始化器中的显式借用延长了返回数组的生命周期：
 
 ```rust,ignore
 fn make_array() -> [i32; 2] {
@@ -134,13 +117,9 @@ fn main() {
 }
 ```
 
-This prints `1`, then `99`, each on its own line. The call runs once, its
-returned array occupies temporary storage, and `r` refers to its first element.
-That array remains valid until the end of `main`'s block.
+这会分别在两行输出 `1` 和 `99`。调用执行一次，其返回数组占用临时存储，而 `r` 引用该数组的第一个元素。该数组保持有效直到 `main` 的块结束。
 
-Returning a reference from an ordinary function or method call does not by
-itself extend an argument temporary's lifetime. For example, using the
-`make_array` function above:
+从普通函数或方法调用返回引用本身不会延长实参临时值的生命周期。例如，使用上面的 `make_array` 函数：
 
 ```rust,ignore
 fn first(values: &mut [i32; 2]) -> &mut i32 {
@@ -153,35 +132,31 @@ fn example() {
 }
 ```
 
-This last example is outside the [lifetime validity guarantee](undefined-behavior.md#lifetime-validity);
-the compiler need not diagnose it. A conforming implementation may retain
-temporary storage until function return, or optimize it away when observable
-behavior and valid references are preserved, as described in
-[References](references.md#storage-and-implementation). Retaining storage does
-not make an otherwise invalid source reference valid.
+最后一个示例不在[生命周期有效性保证](undefined-behavior.md#lifetime-validity)范围内；编译器无需诊断它。符合规范的实现可以将临时存储保留到函数返回，也可以在保留可观察行为和有效引用的前提下将其优化掉，具体见[引用](references.md#storage-and-implementation)。保留存储不会使原本无效的源代码引用变得有效。
 
 </details>
 
-## Precedence
+<a id="precedence"></a>
+## 优先级
 
-The following groups run from strongest to weakest. Operators in a row share precedence.
+以下分组按优先级从高到低排列。同一行中的运算符共享优先级。
 
 | Group | Associativity |
 | --- | --- |
-| Paths, literals, grouping | Primary forms |
-| Field and method access, calls, indexing | Postfix |
-| Unary `-`, `!`, `*`, `&`, `&mut` | Prefix |
-| `as` | Left |
-| `*`, `/`, `%` | Left |
-| `+`, `-` | Left |
-| `<<`, `>>` | Left |
-| `&` | Left |
-| `^` | Left |
-| <code>&#124;</code> | Left |
-| `==`, `!=`, `<`, `<=`, `>`, `>=` | Cannot be chained without parentheses |
-| `&&` | Left |
-| <code>&#124;&#124;</code> | Left |
-| `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `^=`, <code>&#124;=</code>, `<<=`, `>>=` | Right |
-| `return`, `break` with a value | Consume the following expression |
+| 路径、字面量、分组 | 基本形式 |
+| 字段和方法访问、调用、索引 | 后缀 |
+| 一元 `-`、`!`、`*`、`&`、`&mut` | 前缀 |
+| `as` | 左结合 |
+| `*`、`/`、`%` | 左结合 |
+| `+`、`-` | 左结合 |
+| `<<`、`>>` | 左结合 |
+| `&` | 左结合 |
+| `^` | 左结合 |
+| <code>&#124;</code> | 左结合 |
+| `==`、`!=`、`<`、`<=`、`>`、`>=` | 不加括号不能链接 |
+| `&&` | 左结合 |
+| <code>&#124;&#124;</code> | 左结合 |
+| `=`、`+=`、`-=`、`*=`、`/=`、`%=`、`&=`、`^=`、<code>&#124;=</code>、`<<=`、`>>=` | 右结合 |
+| `return`、带值的 `break` | 消耗后续表达式 |
 
-Block/statement disambiguation additionally follows [Statements](statements.md#statement-boundary).
+块/语句消歧还遵循[语句](statements.md#statement-boundary)中的规则。

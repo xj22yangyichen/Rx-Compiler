@@ -61,7 +61,7 @@ fn shorten<'long: 'short, 'short>(value: &'long i32) -> &'short i32 {
 ```
 
 <a id="where-clauses"></a>
-## Where 子句
+## `where` 子句
 
 r[items.generics.where.syntax]
 ```grammar,items

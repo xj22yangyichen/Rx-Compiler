@@ -1,13 +1,7 @@
-# Grammar summary
+# 语法汇总
 
-This page collects every production from the language chapters. Lexer rules
-define tokens and separators; syntax rules combine them into types, items,
-statements, and expressions. Each category has a **Show syntax diagram** button,
-and production names link to their diagrams.
+本页汇总语言各章节中的所有产生式。词法规则定义词法单元和分隔符；语法规则将它们组合成类型、条目、语句和表达式。每个类别都有一个**显示语法图**按钮，产生式名称链接到对应的语法图。
 
-[Notation](notation.md) explains the symbols. [Parser conventions](grammar.md)
-specifies operator precedence and contextual punctuation disambiguation, and provides a syntax
-coverage table. Typing, lookup, and runtime semantics accompany the productions
-in their respective chapters.
+[记法](notation.md)解释这些符号。[解析器约定](grammar.md)规定运算符优先级和上下文标点消歧，并提供语法覆盖表。类型、查找和运行时语义随产生式在各自章节中给出。
 
 {{ grammar-summary }}

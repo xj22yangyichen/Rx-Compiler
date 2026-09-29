@@ -87,7 +87,7 @@ Rx 子集不包含：
 [相等性规则](builtin-traits.md#partialeq)定义操作数类型、能力要求和同类型比较。根据[类型同一性](types.md#supported-types)，仅生命周期实参不同不足以区分源类型。
 
 <a id="use-compatibility"></a>
-### use 兼容性
+### `use` 兼容性
 
 测试可以包含 [use 声明](items/use-declarations.md)，例如 `use rx::core::*;`，以便使用 Rust 和课程支持 crate 编译同一份源代码。它们的导入路径和组合在该 Rust 环境中有效。程序使用的任何导入名称都以其现有拼写表示某个 Rx 内建项；允许未使用的导入和别名。测试绝不依赖 use 声明向 Rx 引入其他类型、值、模块或可用别名。
 

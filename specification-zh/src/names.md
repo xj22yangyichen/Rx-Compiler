@@ -1,53 +1,56 @@
-# Names and scopes
+# 名称与作用域
 
-## Scope rules
+<a id="scope-rules"></a>
+## 作用域规则
 
-Top-level functions, structs, constants, and inherent associated items introduce names. Parameters and `let` statements introduce local bindings. Fields belong to their enclosing struct's namespace and are resolved through the receiver's type.
+顶层函数、结构体、常量和固有关联条目会引入名称。参数和 `let` 语句会引入局部绑定。字段属于其外层结构体的命名空间，并通过接收者类型解析。
 
-[Use declarations](items/use-declarations.md) do not introduce names in Rx and participate in neither name resolution nor collision checks. Imported paths and aliases may be discarded after parsing; the builtin environment is independent of these declarations.
+[use 声明](items/use-declarations.md)不会在 Rx 中引入名称，也不参与名称解析或冲突检查。导入路径和别名可以在解析后丢弃；内建环境独立于这些声明。
 
-Top-level and associated-item lookup is independent of declaration order. A local binding is visible only after its initializer and until the end of its block, subject to shadowing. Constant initializers, array lengths, and array-repeat lengths may use constant-item paths under the [constant-context rules](const_eval.md), which also require acyclic constant dependencies.
+顶层和关联条目的查找与声明顺序无关。局部绑定只有在其初始化器之后才可见，并持续到其块结束，同时受遮蔽规则约束。常量初始化器、数组长度和数组重复长度可以根据[常量上下文规则](const_eval.md)使用常量条目路径；这些规则还要求常量依赖无环。
 
-`self` denotes a method receiver. `Self` denotes the struct being declared or the target type of the current inherent implementation, including within its associated items. Neither is an ordinary user-defined identifier, and `Self` cannot be used in top-level functions declared outside of an `impl` block.
+`self` 表示方法接收者。`Self` 表示正在声明的结构体，或当前固有实现的目标类型，包括其关联条目内部。二者都不是普通的用户定义标识符，并且不能在 `impl` 块之外声明的顶层函数中使用 `Self`。
 
-Lifetime names occupy a separate namespace governed by [lifetime parameters](items/generics.md) and the [lifetime validity guarantee](undefined-behavior.md#lifetime-validity).
+生命周期名称占用独立的命名空间，其规则由[生命周期参数](items/generics.md)和[生命周期有效性保证](undefined-behavior.md#lifetime-validity)规定。
 
-### Type and value namespaces
+### 类型和数值命名空间
 
-Types and values use separate namespaces:
+类型和值使用不同的命名空间：
 
-| Context | Namespace |
+| 上下文 | 命名空间 |
 | --- | --- |
-| Struct name, primitive type, `Box`, `Vec`, or `Self` in a type position | Type |
-| Function, constant, local binding, or `self` in an expression | Value |
-| Prefix of `Type::member` | Type |
-| Struct field | That struct's field namespace |
+| 类型位置中的结构体名称、基本类型、`Box`、`Vec` 或 `Self` | 类型 |
+| 表达式中的函数、常量、局部绑定或 `self` | 值 |
+| `Type::member` 的前缀 | 类型 |
+| 结构体字段 | 该结构体的字段命名空间 |
 
-A named-field struct is not a callable value constructor; therefore, a struct and a function may share the same name without collision.
+具名字段结构体不是可调用的值构造器，因此结构体和函数可以共享同一名称而不发生冲突。
 
-## Name collisions
+<a id="name-collisions"></a>
+## 名称冲突
 
-Top-level names must be unique within their namespace. Fields within a struct and parameters within a function must also be unique. All inherent implementations of a struct share a single associated-value namespace; defining duplicate methods, associated functions, or associated constants is a compile-time error, regardless of their signatures or whether they are declared across different `impl` blocks. A struct field and an inherent method may share the same name because they reside in separate namespaces.
+顶层名称在各自命名空间内必须唯一。结构体内的字段和函数内的参数也必须唯一。结构体的所有固有实现共享一个关联值命名空间；无论签名如何，也无论是否在不同的 `impl` 块中声明，定义重复的方法、关联函数或关联常量都属于编译时错误。结构体字段和固有方法可以共享名称，因为它们位于不同的命名空间。
 
-Successive `let` bindings may shadow earlier locals, parameters, and non-protected global functions. Lookup resolves to the nearest enclosing binding; if that binding is not callable, an invocation is a compile-time error rather than falling back to an outer shadowed function. The initializer expression of a `let` binding is evaluated in the scope preceding the newly introduced binding.
+连续的 `let` 绑定可以遮蔽较早的局部变量、参数和未受保护的全局函数。查找解析到最近的外层绑定；如果该绑定不可调用，则调用属于编译时错误，不会退回到被遮蔽的外层函数。`let` 绑定的初始化表达式在新引入绑定之前的作用域中求值。
 
-A `let` or ordinary parameter that collides with a visible unqualified constant is undefined behavior under the centralized [constant-name collision guarantee](undefined-behavior.md#constant-name-collisions).
+与可见的非限定常量冲突的 `let` 绑定或普通参数，根据统一的[常量名称冲突保证](undefined-behavior.md#constant-name-collisions)属于未定义行为。
 
-## Protected builtin names
+<a id="protected-builtin-names"></a>
+## 受保护的内建名称
 
-The following names are protected in their respective namespaces:
+以下名称在各自的命名空间中受到保护：
 
-| Namespace | Protected names |
+| 命名空间 | 受保护名称 |
 | --- | --- |
-| Type | `i32`, `u32`, `isize`, `usize`, `bool`, `Box`, `Vec`, `Copy`, `Clone`, `PartialEq`, `Eq` |
-| Value | `get_i32`, `print_i32`, `println_i32` |
-| Derive entry | `Copy`, `Clone`, `PartialEq`, `Eq` |
+| 类型 | `i32`、`u32`、`isize`、`usize`、`bool`、`Box`、`Vec`、`Copy`、`Clone`、`PartialEq`、`Eq` |
+| 值 | `get_i32`、`print_i32`、`println_i32` |
+| Derive 条目 | `Copy`、`Clone`、`PartialEq`、`Eq` |
 
-These protected names remain valid lexical identifiers. They may be used in other namespaces or as field and associated-item names (for example, a field named `Vec` is valid). Because inherent implementations can only be declared for user-defined structs, inherent methods cannot be added to protected builtin types.
+这些受保护名称仍然是有效的词法标识符。它们可以在其他命名空间中使用，也可以用作字段名和关联条目名（例如，名为 `Vec` 的字段是有效的）。由于固有实现只能为用户定义的结构体声明，不能向受保护的内建类型添加固有方法。
 
-The following collisions are undefined behavior under the [test guarantees](undefined-behavior.md#test-guarantees), with no required diagnostic or behavior:
+根据[测试保证](undefined-behavior.md#test-guarantees)，以下冲突属于未定义行为，不要求诊断或特定行为：
 
-- Declaring a struct named `u32`, `isize`, `usize`, `bool`, `Box`, `Vec`, `Copy`, `Clone`, `PartialEq`, or `Eq`.
-- Declaring a local binding (`let` or ordinary parameter) named `get_i32`, `print_i32`, or `println_i32`.
+- 声明名为 `u32`、`isize`、`usize`、`bool`、`Box`、`Vec`、`Copy`、`Clone`、`PartialEq` 或 `Eq` 的结构体。
+- 声明名为 `get_i32`、`print_i32` 或 `println_i32` 的局部绑定（`let` 或普通参数）。
 
-Other redeclarations of protected builtins within their respective namespaces are compile-time errors, including defining a struct named `i32` or declaring a top-level function or constant with a protected I/O name.
+在各自命名空间内对受保护内建项的其他重新声明属于编译时错误，包括定义名为 `i32` 的结构体，或声明使用受保护 I/O 名称的顶层函数或常量。

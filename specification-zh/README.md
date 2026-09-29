@@ -26,8 +26,10 @@ SPEC_RELATIVE=0 SPEC_DENY_WARNINGS=1 mdbook build
 生成的网站将写入 `book/`。如需本地预览：
 
 ```sh
-SPEC_RELATIVE=0 mdbook serve --open
+make serve
 ```
+
+默认地址为 http://127.0.0.1:3000/。也可以通过 `HOST` 和 `PORT` 覆盖监听地址和端口，例如 `make serve HOST=0.0.0.0 PORT=4000`。
 
 <a id="issues-and-contributing"></a>
 

@@ -1,18 +1,20 @@
 r[lex.keywords]
-# Keywords
+# 关键字
 
-The strict and reserved keywords listed below cannot be used as identifiers anywhere in Rx. The lists are string-table productions as described in [Notation](notation.md#string-table-productions).
+下列严格关键字和保留关键字不能在 Rx 的任何位置用作标识符。这些列表是[记法](notation.md#string-table-productions)中所述的字符串表产生式。
 
 r[lex.keywords.strict]
-## Strict keywords
+<a id="strict-keywords"></a>
+## 严格关键字
 
 `as`, `break`, `const`, `continue`, `crate`, `else`, `enum`, `extern`, `false`, `fn`, `for`, `if`, `impl`, `in`, `let`, `loop`, `match`, `mod`, `move`, `mut`, `pub`, `ref`, `return`, `self`, `Self`, `static`, `struct`, `super`, `trait`, `true`, `type`, `unsafe`, `use`, `where`, `while`, `async`, `await`, `dyn`.
 
 r[lex.keywords.reserved]
-## Reserved keywords
+<a id="reserved-keywords"></a>
+## 保留关键字
 
 `abstract`, `become`, `box`, `do`, `final`, `macro`, `override`, `priv`, `typeof`, `unsized`, `virtual`, `yield`, `try`.
 
-## Contextual names
+## 上下文名称
 
-Contextual keywords in Rust (such as `union`, `macro_rules`, and `gen`) may be used as ordinary identifiers in Rx. Built-in type and trait names and standard I/O function names are governed by the [protected namespace rules](names.md#protected-builtin-names).
+Rust 中的上下文关键字（例如 `union`、`macro_rules` 和 `gen`）可以在 Rx 中用作普通标识符。内建类型名、Trait 名以及标准 I/O 函数名受[受保护命名空间规则](names.md#protected-builtin-names)约束。

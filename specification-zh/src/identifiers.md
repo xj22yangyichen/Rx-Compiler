@@ -1,5 +1,5 @@
 r[ident]
-# Identifiers
+# 标识符
 
 r[ident.syntax]
 ```grammar,lexer
@@ -14,6 +14,6 @@ NON_KEYWORD_IDENTIFIER -> IDENTIFIER_OR_KEYWORD _except `_` and a [strict](keywo
 IDENTIFIER -> NON_KEYWORD_IDENTIFIER
 ```
 
-Identifiers use ASCII letters, digits, and underscores as specified above. They are case-sensitive and have no fixed length limit. `_value`, `_1`, and `__` are identifiers; `_` alone is punctuation and cannot be a binding or assignment destination.
+标识符使用上面规定的 ASCII 字母、数字和下划线。标识符区分大小写，没有固定的长度限制。`_value`、`_1` 和 `__` 是标识符；单独的 `_` 是标点符号，不能作为绑定或赋值目标。
 
-`self` and `Self` are keywords with the semantics specified in [Names](names.md). In contrast, built-in names such as `i32`, `Vec`, and `Clone` are lexically standard identifiers; their restrictions are enforced by namespace scoping rules rather than dedicated lexer keyword rules.
+`self` 和 `Self` 是关键字，其语义见[名称](names.md)。相比之下，`i32`、`Vec` 和 `Clone` 等内建名称在词法上是普通标识符；它们的限制由命名空间作用域规则强制执行，而不是由专门的词法分析器关键字规则执行。

@@ -1,8 +1,8 @@
-# Constant contexts
+# 常量上下文
 
-Constant contexts are const-item initializers, array type lengths, and array-repeat lengths. Each uses the restricted forms defined below, including references to constant items.
+常量上下文包括常量条目初始化器、数组类型长度和数组重复长度。每种上下文都使用下面定义的受限形式，包括对常量条目的引用。
 
-## Allowed forms
+## 允许的形式
 
 ```grammar,constants
 ConstValue -> INTEGER_LITERAL | `true` | `false` | ConstantPath | `-` Magnitude | `(` ConstValue `)`
@@ -12,9 +12,9 @@ Magnitude -> INTEGER_LITERAL | ConstantPath | `(` Magnitude `)`
 ConstantPath -> PathInExpression
 ```
 
-`ConstantPath` must resolve to a constant item, either directly or through an associated-constant path such as `LIMIT`, `Config::LIMIT`, or `Self::LIMIT`. A path to a local, function, or other value is a static form error. In this grammar, `Magnitude` denotes an integer literal or constant path without a leading minus, rather than an unsigned target type. Negative forms require a signed integer type. These forms permit `123`, `LIMIT`, `-LIMIT`, `(-1)`, `-(1)`, `((true))`, and valid suffixes and radices.
+`ConstantPath` 必须解析为常量条目，可以直接解析，也可以通过 `LIMIT`、`Config::LIMIT` 或 `Self::LIMIT` 这样的关联常量路径解析。指向局部变量、函数或其他值的路径属于静态形式错误。在此语法中，`Magnitude` 表示不带前导减号的整数字面量或常量路径，而不是无符号目标类型。负数形式要求有符号整数类型。这些形式允许 `123`、`LIMIT`、`-LIMIT`、`(-1)`、`-(1)`、`((true))` 以及有效的后缀和进制。
 
-Each constant context contains an integer or boolean literal, a constant-item reference, an optionally parenthesized negative integer or constant, or parentheses around another allowed form. Any other expression is a static form error.
+每个常量上下文包含整数或布尔字面量、常量条目引用、可选加括号的负整数或常量，或者包围另一个允许形式的括号。任何其他表达式都属于静态形式错误。
 
 ```rust,ignore
 const COUNT: usize = 64;
@@ -28,22 +28,17 @@ fn main() {
 }
 ```
 
-Constant paths are evaluated recursively through their referenced constant
-items. A constant item may be declared before or after the item that uses it.
-The dependency graph must be acyclic: a self-reference or an indirect cycle
-such as `A -> B -> A` is a compile error. The compiler must detect a cycle
-before attempting to evaluate the involved constants.
+常量路径会递归地通过其引用的常量条目求值。常量条目可以在使用它的条目之前或之后声明。依赖图必须无环：自引用或 `A -> B -> A` 这样的间接循环属于编译时错误。编译器必须在尝试计算相关常量之前检测循环。
 
-## Typing and range
+<a id="typing-and-range"></a>
+## 类型与范围
 
-A constant path has the declared type and value
-of its target item. Const-item initializers have the declared expected type;
-array lengths are constant values and have expected type `usize`.
+常量路径具有其目标条目声明的类型和值。常量条目初始化器具有声明的期望类型；数组长度是常量值，其期望类型为 `usize`。
 
-Literal typing and signed-minimum cases follow [integer literal rules](expressions/literal-expr.md#integer-typing-and-range). Out-of-range literals are undefined behavior under the [integer literal range guarantee](undefined-behavior.md#integer-literal-range). Ordinary type and restricted-form errors remain compile errors.
+字面量类型和有符号最小值情况遵循[整数字面量规则](expressions/literal-expr.md#integer-typing-and-range)。超出范围的字面量根据[整数字面量范围保证](undefined-behavior.md#integer-literal-range)属于未定义行为。普通类型错误和受限形式错误仍是编译时错误。
 
-The [propagation exclusion](types.md#coercion-sites-and-expected-types) also applies here: `const N: isize = -1;` is undefined behavior because it needs the expected type to pass through unary minus. Write `-1isize` instead. `const N: i32 = -1;` is valid because the literal `-1` defaults to `i32`.
+这里同样适用[传播排除规则](types.md#coercion-sites-and-expected-types)：`const N: isize = -1;` 属于未定义行为，因为它需要期望类型穿过一元减号。应改写为 `-1isize`。`const N: i32 = -1;` 有效，因为字面量 `-1` 默认使用 `i32`。
 
-The element expression in `[expr; 4]` is an ordinary expression governed by [array repetition](expressions/array-expr.md#array-expressions). Only its length is a constant context.
+`[expr; 4]` 中的元素表达式是遵循[数组重复](expressions/array-expr.md#array-expressions)规则的普通表达式。只有其长度属于常量上下文。
 
-Constant propagation and folding of ordinary runtime expressions remain permitted optimizations. They do not turn those expressions into const contexts or change their arithmetic semantics.
+对普通运行时表达式进行常量传播和折叠仍属于允许的优化。它们不会将这些表达式变成常量上下文，也不会改变其算术语义。

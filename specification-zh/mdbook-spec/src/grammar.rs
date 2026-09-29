@@ -294,11 +294,16 @@ pub fn insert_grammar(grammar: &Grammar, chapter: &Chapter, diag: &mut Diagnosti
 /// Creates a map of production name -> relative link path.
 fn make_relative_link_map(grammar: &Grammar, chapter: &Chapter) -> HashMap<String, String> {
     let current_path = chapter.path.as_ref().unwrap().parent().unwrap();
+    let chapter_path = chapter.path.as_ref().unwrap();
     grammar
         .productions
         .values()
         .map(|p| {
-            let relative = pathdiff::diff_paths(&p.path, current_path).unwrap();
+            let relative = if &p.path == chapter_path {
+                PathBuf::new()
+            } else {
+                pathdiff::diff_paths(&p.path, current_path).unwrap()
+            };
             // Adjust paths for Windows.
             let relative = relative.display().to_string().replace('\\', "/");
             (p.name.clone(), relative)
@@ -323,9 +328,9 @@ fn render_names(
          \n",
     );
     if for_lexer {
-        output.push_str("**<sup>Lexer</sup>**\n");
+        output.push_str("**<sup>词法</sup>**\n");
     } else {
-        output.push_str("**<sup>Syntax</sup>**\n");
+        output.push_str("**<sup>语法</sup>**\n");
     }
     output.push_str("<br>\n");
 
@@ -361,10 +366,10 @@ fn render_names(
 
     output.push_str(
         "\n\
-         <button class=\"grammar-toggle-railroad\" type=\"button\" \
-            title=\"Toggle railroad display\" \
+            <button class=\"grammar-toggle-railroad\" type=\"button\" \
+                title=\"切换铁路图显示\" \
             onclick=\"toggle_railroad()\">\
-            Show Railroad\
+                显示铁路图\
          </button>\n\
          </div>\n\
          <div class=\"grammar-railroad grammar-hidden\">\n\
@@ -385,7 +390,7 @@ fn render_names(
 }
 
 pub fn is_summary(chapter: &Chapter) -> bool {
-    chapter.name == "Grammar summary"
+    chapter.name == "Grammar summary" || chapter.content.contains("{{ grammar-summary }}")
 }
 
 /// Inserts the summary of all grammar rules into the grammar summary chapter.
@@ -400,9 +405,18 @@ pub fn insert_summary(grammar: &Grammar, chapter: &Chapter, diag: &mut Diagnosti
         .collect();
     let mut grammar_summary = String::new();
     for category in categories {
-        let mut chars = category.chars();
-        let cap = chars.next().unwrap().to_uppercase().collect::<String>() + chars.as_str();
-        write!(grammar_summary, "\n## {cap} summary\n\n").unwrap();
+        let label = match category.as_str() {
+            "lexer" => "词法",
+            "items" => "条目",
+            "paths" => "路径",
+            "types" => "类型",
+            "attributes" => "属性",
+            "statements" => "语句",
+            "expressions" => "表达式",
+            "constants" => "常量",
+            _ => category,
+        };
+        write!(grammar_summary, "\n## {label}汇总\n\n").unwrap();
         let names: Vec<_> = grammar
             .name_order
             .iter()
