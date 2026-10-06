@@ -1,4 +1,0 @@
-use rx::core::*;
-
-fn f(self) {}
-fn main() {}

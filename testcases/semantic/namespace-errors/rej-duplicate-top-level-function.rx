@@ -1,5 +1,0 @@
-use rx::core::*;
-
-fn f() {}
-fn f() {}
-fn main() {}

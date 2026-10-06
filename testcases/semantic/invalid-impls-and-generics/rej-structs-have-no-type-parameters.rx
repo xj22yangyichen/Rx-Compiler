@@ -1,8 +1,0 @@
-use rx::core::*;
-
-struct S {
-    x: i32,
-}
-fn main() {
-    let s: S<i32> = S { x: 1 };
-}

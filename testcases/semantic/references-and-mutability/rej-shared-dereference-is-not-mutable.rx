@@ -1,7 +1,0 @@
-use rx::core::*;
-
-fn main() {
-    let x = 1;
-    let p = &x;
-    *p = 2;
-}

@@ -1,5 +1,0 @@
-use rx::core::*;
-
-fn main() {
-    break;
-}

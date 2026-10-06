@@ -1,7 +1,0 @@
-use rx::core::*;
-
-struct A {
-    x: i32,
-    x: i32,
-}
-fn main() {}

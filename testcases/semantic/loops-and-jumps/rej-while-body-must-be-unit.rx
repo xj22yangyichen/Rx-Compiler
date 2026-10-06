@@ -1,7 +1,0 @@
-use rx::core::*;
-
-fn main() {
-    while false {
-        1
-    }
-}

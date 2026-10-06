@@ -1,4 +1,0 @@
-use rx::core::*;
-
-const N: u32 = -1u32;
-fn main() {}

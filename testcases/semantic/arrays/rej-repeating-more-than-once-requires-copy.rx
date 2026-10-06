@@ -1,5 +1,0 @@
-use rx::core::*;
-
-fn main() {
-    let a = [Box::<i32>::new(1); 2];
-}

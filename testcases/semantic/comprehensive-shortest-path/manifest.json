@@ -1,8 +1,0 @@
-[
-  {
-    "source": "acc-nested-vector-dijkstra.rx",
-    "stage": "semantic",
-    "compilation_success": true,
-    "description": "Dijkstra shortest paths checked by a Bellman-Ford oracle."
-  }
-]

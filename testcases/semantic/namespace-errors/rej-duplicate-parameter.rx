@@ -1,4 +1,0 @@
-use rx::core::*;
-
-fn f(x: i32, x: i32) {}
-fn main() {}

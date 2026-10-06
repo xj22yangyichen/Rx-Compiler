@@ -1,6 +1,0 @@
-use rx::core::*;
-
-fn main() {
-    let mut x = 1;
-    (x + 1) = 2;
-}

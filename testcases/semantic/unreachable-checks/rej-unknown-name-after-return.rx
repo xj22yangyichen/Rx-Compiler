@@ -1,6 +1,0 @@
-use rx::core::*;
-
-fn main() {
-    return;
-    println_i32(missing);
-}

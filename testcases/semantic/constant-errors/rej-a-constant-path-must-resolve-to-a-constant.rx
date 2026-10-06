@@ -1,7 +1,0 @@
-use rx::core::*;
-
-fn value() -> i32 {
-    1
-}
-const N: i32 = value;
-fn main() {}

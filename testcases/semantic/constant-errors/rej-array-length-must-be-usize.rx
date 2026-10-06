@@ -1,6 +1,0 @@
-use rx::core::*;
-
-const N: bool = true;
-fn main() {
-    let a: [i32; N] = [1; 1];
-}

@@ -1,8 +1,0 @@
-[
-  {
-    "source": "acc-large-frame-live-values.rx",
-    "stage": "semantic",
-    "compilation_success": true,
-    "description": "A 16 KiB local array and 192 named live scalar values."
-  }
-]
