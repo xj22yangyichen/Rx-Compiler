@@ -15,8 +15,17 @@ dev/
 *.local.*
 
 # hidden files
-.claude/
 .xmake/
 .idea/
 .vscode/
+.gitignore
+.clangd
+
+# AI
+.claude/
 .cc-history/
+CLAUDE.md
+
+# tests
+/tests/custom/
+/scripts
