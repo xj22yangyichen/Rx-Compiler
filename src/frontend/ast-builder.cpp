@@ -8,11 +8,7 @@ namespace {
 using Context = antlr4::ParserRuleContext;
 
 Context* rule(antlr4::tree::ParseTree* tree) {
-  auto* context = dynamic_cast<Context*>(tree);
-  if (!context) {
-    throw std::logic_error("expected an AST operand rule");
-  }
-  return context;
+  return static_cast<Context*>(tree);
 }
 
 Span joinedSpan(const Span& left, const Span& right) {
@@ -79,10 +75,8 @@ Root AstBuilder::build_root(Context* context) {
       return build_type(context);
     case RxParser::RuleLetStatement:
       return build_stmt(context);
-    case RxParser::RuleExpression:
-      return build_expr(context);
     default:
-      throw std::logic_error("unsupported AST root");
+      return build_expr(context);
   }
 }
 
@@ -100,9 +94,6 @@ PathSegment AstBuilder::build_segment(Context* context) {
       }
     }
   }
-  if (segment.name.empty()) {
-    throw std::logic_error("AST path segment has no name");
-  }
   return segment;
 }
 
@@ -115,9 +106,6 @@ Path AstBuilder::build_path(Context* context) {
     else if (auto* segment = dynamic_cast<RxParser::PathExprSegmentContext*>(child)) {
       path.push_back(build_segment(segment));
     }
-  }
-  if (path.empty()) {
-    throw std::logic_error("AST path has no segments");
   }
   return path;
 }
@@ -158,53 +146,51 @@ TypePtr AstBuilder::build_type(Context* context) {
     }
     return result;
   }
-  if (auto* type = dynamic_cast<RxParser::ClosedCastTypeContext*>(context)) {
-    if (type->arrayType()) {
-      return build_type(type->arrayType());
-    }
-    if (type->LPAREN()) {
-      TypePtr result;
-      if (type->typeRef()) {
-        result = build_type(type->typeRef());
-      }
-      else {
-        result = makeNode<Type>(span, UnitType{});
-      }
-      result->span = span;
-      return result;
-    }
-    if (type->closedCastType()) {
-      auto inner_span = span;
-      if (type->ANDAND()) {
-        ++inner_span.begin;
-        ++inner_span.column;
-      }
-      auto result = makeNode<Type>(
-        inner_span, RefType{type->MUT() != nullptr, build_type(type->closedCastType())});
-      if (type->ANDAND()) {
-        result = makeNode<Type>(span, RefType{false, std::move(result)});
-      }
-      return result;
-    }
-    Path path;
-    for (auto* segment : type->typePathSegment()) {
-      path.push_back(build_segment(segment));
-    }
-    auto final_segment = build_segment(type);
-    final_segment.span = sourceSpan(type->pathIdentSegment());
-    final_segment.span.end = sourceSpan(type->genericArgs()).end;
-    path.push_back(std::move(final_segment));
-    return makeNode<Type>(span, PathType{std::move(path)});
+  auto* type = static_cast<RxParser::ClosedCastTypeContext*>(context);
+  if (type->arrayType()) {
+    return build_type(type->arrayType());
   }
-  throw std::logic_error("unsupported AST type rule");
+  if (type->LPAREN()) {
+    TypePtr result;
+    if (type->typeRef()) {
+      result = build_type(type->typeRef());
+    }
+    else {
+      result = makeNode<Type>(span, UnitType{});
+    }
+    result->span = span;
+    return result;
+  }
+  if (type->closedCastType()) {
+    auto inner_span = span;
+    if (type->ANDAND()) {
+      ++inner_span.begin;
+      ++inner_span.column;
+    }
+    auto result = makeNode<Type>(
+      inner_span, RefType{type->MUT() != nullptr, build_type(type->closedCastType())});
+    if (type->ANDAND()) {
+      result = makeNode<Type>(span, RefType{false, std::move(result)});
+    }
+    return result;
+  }
+  Path path;
+  for (auto* segment : type->typePathSegment()) {
+    path.push_back(build_segment(segment));
+  }
+  auto final_segment = build_segment(type);
+  final_segment.span = sourceSpan(type->pathIdentSegment());
+  final_segment.span.end = sourceSpan(type->genericArgs()).end;
+  path.push_back(std::move(final_segment));
+  return makeNode<Type>(span, PathType{std::move(path)});
 }
 
 ItemPtr AstBuilder::build_item(Context* context) {
   if (auto* item = dynamic_cast<RxParser::ItemContext*>(context)) {
-    return build_item(dynamic_cast<Context*>(item->children.at(0)));
+    return build_item(rule(item->children.at(0)));
   }
   if (auto* item = dynamic_cast<RxParser::AssociatedItemContext*>(context)) {
-    return build_item(dynamic_cast<Context*>(item->children.at(0)));
+    return build_item(rule(item->children.at(0)));
   }
   const auto span = sourceSpan(context);
   if (dynamic_cast<RxParser::UseDeclarationContext*>(context)) {
@@ -251,14 +237,12 @@ ItemPtr AstBuilder::build_item(Context* context) {
         build_type(constant->typeRef()),
         build_expr(constant->constValue())});
   }
-  if (auto* impl = dynamic_cast<RxParser::InherentImplContext*>(context)) {
-    ImplItem value{build_type(impl->typeRef()), {}};
-    for (auto* item : impl->associatedItem()) {
-      value.items.push_back(build_item(item));
-    }
-    return makeNode<Item>(span, std::move(value));
+  auto* impl = static_cast<RxParser::InherentImplContext*>(context);
+  ImplItem value{build_type(impl->typeRef()), {}};
+  for (auto* item : impl->associatedItem()) {
+    value.items.push_back(build_item(item));
   }
-  throw std::logic_error("unsupported AST item rule");
+  return makeNode<Item>(span, std::move(value));
 }
 
 StmtPtr AstBuilder::build_stmt(Context* context) {
@@ -275,10 +259,7 @@ StmtPtr AstBuilder::build_stmt(Context* context) {
         std::move(type),
         build_expr(binding->expression())});
   }
-  auto* statement = dynamic_cast<RxParser::StatementContext*>(context);
-  if (!statement) {
-    throw std::logic_error("unsupported AST statement rule");
-  }
+  auto* statement = static_cast<RxParser::StatementContext*>(context);
   if (statement->letStatement()) {
     return build_stmt(statement->letStatement());
   }
@@ -370,9 +351,6 @@ ExprPtr AstBuilder::build_chain(Context* context) {
     }
     operator_text.clear();
   }
-  if (!result || !operator_text.empty()) {
-    throw std::logic_error("incomplete AST expression chain");
-  }
   return result;
 }
 
@@ -394,7 +372,7 @@ ExprPtr AstBuilder::build_unary(Context* context) {
     operand = makeNode<Expr>(inner_span, UnaryExpr{inner_op, std::move(operand)});
     return makeNode<Expr>(span, UnaryExpr{Op::BORROW, std::move(operand)});
   }
-  Op op;
+  Op op = Op::BORROW_MUT;
   if (text == "-") {
     op = Op::NEGATE;
   }
@@ -406,12 +384,6 @@ ExprPtr AstBuilder::build_unary(Context* context) {
   }
   else if (text == "&") {
     op = Op::BORROW;
-  }
-  else if (text == "&mut") {
-    op = Op::BORROW_MUT;
-  }
-  else {
-    throw std::logic_error("unknown unary operator: " + text);
   }
   return makeNode<Expr>(span, UnaryExpr{op, std::move(operand)});
 }
@@ -452,10 +424,7 @@ ExprPtr AstBuilder::build_postfix(Context* context) {
       }
       suffix = postfix->dotSuffix();
     }
-    auto* dot = dynamic_cast<RxParser::DotSuffixContext*>(suffix);
-    if (!dot) {
-      throw std::logic_error("unknown AST postfix suffix");
-    }
+    auto* dot = static_cast<RxParser::DotSuffixContext*>(suffix);
     if (dot->callArguments()) {
       result = makeNode<Expr>(span,
         MethodCallExpr{std::move(result),
@@ -506,10 +475,7 @@ ExprPtr AstBuilder::build_primary(Context* context) {
         WhileExpr{
           build_expr(rule(context->children.at(1))), build_expr(rule(context->children.at(2)))});
     }
-    if (kind == RxParser::MINUS) {
-      return makeNode<Expr>(span, UnaryExpr{Op::NEGATE, build_expr(rule(context->children.at(1)))});
-    }
-    throw std::logic_error("unknown AST primary token");
+    return makeNode<Expr>(span, UnaryExpr{Op::NEGATE, build_expr(rule(context->children.at(1)))});
   }
   if (auto* path = dynamic_cast<RxParser::PathInExpressionContext*>(first)) {
     if (context->children.size() == 1) {
@@ -525,9 +491,6 @@ ExprPtr AstBuilder::build_primary(Context* context) {
       }
     }
     return makeNode<Expr>(span, std::move(value));
-  }
-  if (context->children.size() != 1) {
-    throw std::logic_error("unhandled AST primary children");
   }
   return build_expr(rule(first));
 }
@@ -622,15 +585,6 @@ ExprPtr AstBuilder::build_expr(Context* context) {
     case RxParser::RuleConditionBreakPostfixExpression:
     case RxParser::RuleStatementPostfixExpression:
       return build_postfix(context);
-    case RxParser::RulePrimaryExpression:
-    case RxParser::RuleNonBlockPrimary:
-    case RxParser::RuleConditionPrimary:
-    case RxParser::RuleConditionPrimaryWithoutBareBlock:
-    case RxParser::RuleExpressionWithBlock:
-    case RxParser::RuleConstValue:
-    case RxParser::RuleMagnitude:
-    case RxParser::RuleLiteralExpression:
-      return build_primary(context);
     case RxParser::RulePathInExpression:
       return makeNode<Expr>(sourceSpan(context), PathExpr{build_path(context)});
     case RxParser::RuleBlockExpression:
@@ -660,8 +614,7 @@ ExprPtr AstBuilder::build_expr(Context* context) {
       return makeNode<Expr>(sourceSpan(context), std::move(value));
     }
     default:
-      throw std::logic_error(
-        "unsupported AST expression rule: " + std::to_string(context->getRuleIndex()));
+      return build_primary(context);
   }
 }
 }
