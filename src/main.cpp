@@ -1,4 +1,5 @@
 #include "frontend/frontend.h"
+#include "ast/ast-printer.h"
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -6,8 +7,8 @@
 #include <string>
 
 namespace {
-constexpr const char* USAGE =
-  "Usage: rxc [--stage lex|parse] [--entry crate|expression|typeRef|item|letStatement] <source.rx>\n";
+constexpr const char* USAGE = "Usage: rxc [--stage lex|parse|ast] [--entry "
+                              "crate|expression|typeRef|item|letStatement] <source.rx>\n";
 }
 
 int main(int argc, char** argv) {
@@ -20,30 +21,51 @@ int main(int argc, char** argv) {
       const std::string argument = argv[i];
       if (argument == "--stage" && i + 1 < argc) {
         const std::string value = argv[++i];
-        if (value == "lex") stage = rx::Stage::LEX;
-        else if (value == "parse") stage = rx::Stage::PARSE;
+        if (value == "lex") {
+          stage = rx::Stage::LEX;
+        }
+        else if (value == "parse") {
+          stage = rx::Stage::PARSE;
+        }
+        else if (value == "ast") {
+          stage = rx::Stage::AST;
+        }
         else {
           std::cerr << "unsupported stage: " << value << '\n';
           return 2;
         }
-      } else if (argument == "--entry" && i + 1 < argc) {
+      }
+      else if (argument == "--entry" && i + 1 < argc) {
         const std::string value = argv[++i];
         has_entry = true;
-        if (value == "crate") entry = rx::Entry::CRATE;
-        else if (value == "expression") entry = rx::Entry::EXPRESSION;
-        else if (value == "typeRef") entry = rx::Entry::TYPE;
-        else if (value == "item") entry = rx::Entry::ITEM;
-        else if (value == "letStatement") entry = rx::Entry::LET_STATEMENT;
+        if (value == "crate") {
+          entry = rx::Entry::CRATE;
+        }
+        else if (value == "expression") {
+          entry = rx::Entry::EXPRESSION;
+        }
+        else if (value == "typeRef") {
+          entry = rx::Entry::TYPE;
+        }
+        else if (value == "item") {
+          entry = rx::Entry::ITEM;
+        }
+        else if (value == "letStatement") {
+          entry = rx::Entry::LET_STATEMENT;
+        }
         else {
           std::cerr << "unsupported entry: " << value << '\n';
           return 2;
         }
-      } else if (argument == "--help") {
+      }
+      else if (argument == "--help") {
         std::cout << USAGE;
         return 0;
-      } else if (!argument.empty() && argument[0] != '-' && file.empty()) {
+      }
+      else if (!argument.empty() && argument[0] != '-' && file.empty()) {
         file = argument;
-      } else {
+      }
+      else {
         std::cerr << "invalid argument: " << argument << '\n';
         return 2;
       }
@@ -53,7 +75,7 @@ int main(int argc, char** argv) {
       return 2;
     }
     if (has_entry && stage == rx::Stage::LEX) {
-      std::cerr << "--entry is only valid with the parse stage\n";
+      std::cerr << "--entry is only valid with the parse or ast stage\n";
       return 2;
     }
 
@@ -62,17 +84,25 @@ int main(int argc, char** argv) {
       std::cerr << "cannot read source: " << file << '\n';
       return 2;
     }
-    const auto diagnostics = rx::check(source, file, stage, entry);
+    const auto result = rx::check(source, file, stage, entry);
     if (source.bad()) {
       std::cerr << "error reading source: " << file << '\n';
       return 2;
     }
-    for (const auto& error : diagnostics) {
-      std::cerr << error.file << ':' << error.line << ':' << error.column
-        << ": " << error.stage << " error: " << error.message << '\n';
+    for (const auto& error : result.diagnostics) {
+      std::cerr << error.file << ':' << error.line << ':' << error.column << ": " << error.stage
+                << " error: " << error.message << '\n';
     }
-    return diagnostics.empty() ? 0 : 1;
-  } catch (const std::exception& error) {
+    if (result.tree) {
+      rx::ast::printAst(std::cout, *result.tree, file);
+      if (!std::cout) {
+        std::cerr << "error writing AST\n";
+        return 2;
+      }
+    }
+    return result.diagnostics.empty() ? 0 : 1;
+  }
+  catch (const std::exception& error) {
     std::cerr << "frontend failure: " << error.what() << '\n';
     return 2;
   }

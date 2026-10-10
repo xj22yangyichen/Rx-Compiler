@@ -1,0 +1,405 @@
+#include "ast-printer.h"
+#include <string_view>
+#include <type_traits>
+
+namespace rx::ast {
+namespace {
+constexpr const char* HEX = "0123456789abcdef";
+
+class Printer
+{
+public:
+  explicit Printer(std::ostream& output) : output_(output) {
+  }
+
+  void print(const Root& root, const std::string& file) {
+    begin_object();
+    field("file", file);
+    field("span_units", "unicode-codepoints");
+    field("root", root);
+    end_object();
+    output_ << '\n';
+  }
+
+private:
+  std::ostream& output_;
+  std::vector<bool> has_fields_;
+
+  void begin_object() {
+    output_ << '{';
+    has_fields_.push_back(false);
+  }
+
+  void end_object() {
+    const bool has_fields = has_fields_.back();
+    has_fields_.pop_back();
+    if (has_fields) {
+      output_ << '\n' << std::string(has_fields_.size() * 2, ' ');
+    }
+    output_ << '}';
+  }
+
+  void begin_node(const Span& span, const char* kind) {
+    begin_object();
+    field("kind", kind);
+    field("span", span);
+  }
+
+  template <class Value>
+  void field(const char* name, const Value& value) {
+    if (has_fields_.back()) {
+      output_ << ',';
+    }
+    has_fields_.back() = true;
+    output_ << '\n' << std::string(has_fields_.size() * 2, ' ');
+    write(name);
+    output_ << ": ";
+    write(value);
+  }
+
+  void write(std::string_view text) {
+    output_ << '"';
+    for (unsigned char character : text) {
+      if (character == '"' || character == '\\') {
+        output_ << '\\' << character;
+      }
+      else if (character < 0x20) {
+        output_ << "\\u00" << HEX[character >> 4] << HEX[character & 15];
+      }
+      else {
+        output_ << character;
+      }
+    }
+    output_ << '"';
+  }
+
+  void write(const std::string& text) {
+    write(std::string_view(text));
+  }
+
+  void write(const char* text) {
+    write(std::string_view(text));
+  }
+
+  void write(bool is_value) {
+    output_ << (is_value ? "true" : "false");
+  }
+
+  template <class Number, std::enable_if_t<std::is_integral_v<Number>, int> = 0>
+  void write(Number number) {
+    output_ << number;
+  }
+
+  template <class Value>
+  void write(const std::unique_ptr<Value>& value) {
+    if (value) {
+      write(*value);
+    }
+    else {
+      output_ << "null";
+    }
+  }
+
+  template <class Value>
+  void write(const std::optional<Value>& value) {
+    if (value) {
+      write(*value);
+    }
+    else {
+      output_ << "null";
+    }
+  }
+
+  template <class Value>
+  void write(const std::vector<Value>& values) {
+    output_ << '[';
+    bool is_first = true;
+    for (const auto& value : values) {
+      if (!is_first) {
+        output_ << ", ";
+      }
+      is_first = false;
+      write(value);
+    }
+    output_ << ']';
+  }
+
+  template <class... Values>
+  void write(const std::variant<Values...>& value) {
+    std::visit(
+      [this](const auto& node) {
+        this->write(node);
+      },
+      value);
+  }
+
+  void write(const Span& span) {
+    begin_object();
+    field("begin", span.begin);
+    field("end", span.end);
+    field("line", span.line);
+    field("column", span.column);
+    end_object();
+  }
+
+  void write(const Crate& crate) {
+    begin_node(crate.span, "Crate");
+    field("items", crate.items);
+    end_object();
+  }
+
+  template <class Node,
+    std::enable_if_t<std::is_same_v<Node, Expr> || std::is_same_v<Node, Type> ||
+        std::is_same_v<Node, Stmt> || std::is_same_v<Node, Item>,
+      int> = 0>
+  void write(const Node& node) {
+    std::visit(
+      [this, &node](const auto& value) {
+        write_node(node.span, value);
+        end_object();
+      },
+      node.value);
+  }
+
+  void write(const PathSegment& segment) {
+    begin_node(segment.span, "PathSegment");
+    field("name", segment.name);
+    field("arguments", segment.arguments);
+    end_object();
+  }
+
+  void write(const FieldInit& field_init) {
+    begin_node(field_init.span, "FieldInit");
+    field("name", field_init.name);
+    field("value", field_init.value);
+    end_object();
+  }
+
+  void write(const Receiver& receiver) {
+    begin_node(receiver.span, "Receiver");
+    field("is_reference", receiver.is_reference);
+    field("is_mutable", receiver.is_mutable);
+    end_object();
+  }
+
+  void write(const Parameter& parameter) {
+    begin_node(parameter.span, "Parameter");
+    field("name", parameter.name);
+    field("is_mutable", parameter.is_mutable);
+    field("type", parameter.type);
+    end_object();
+  }
+
+  void write(const StructField& member) {
+    begin_node(member.span, "StructField");
+    field("name", member.name);
+    field("type", member.type);
+    end_object();
+  }
+
+  void write_node(const Span& span, const PathType& value) {
+    begin_node(span, "PathType");
+    field("path", value.path);
+  }
+
+  void write_node(const Span& span, const RefType& value) {
+    begin_node(span, "RefType");
+    field("is_mutable", value.is_mutable);
+    field("inner", value.inner);
+  }
+
+  void write_node(const Span& span, const ArrayType& value) {
+    begin_node(span, "ArrayType");
+    field("element", value.element);
+    field("length", value.length);
+  }
+
+  void write_node(const Span& span, const UnitType&) {
+    begin_node(span, "UnitType");
+  }
+
+  void write_node(const Span& span, const IntegerExpr& value) {
+    begin_node(span, "IntegerExpr");
+    field("spelling", value.spelling);
+    field("digits", value.digits);
+    field("base", value.base);
+    field("suffix", value.suffix);
+  }
+
+  void write_node(const Span& span, const BoolExpr& value) {
+    begin_node(span, "BoolExpr");
+    field("value", value.is_true);
+  }
+
+  void write_node(const Span& span, const UnitExpr&) {
+    begin_node(span, "UnitExpr");
+  }
+
+  void write_node(const Span& span, const PathExpr& value) {
+    begin_node(span, "PathExpr");
+    field("path", value.path);
+  }
+
+  void write_node(const Span& span, const UnaryExpr& value) {
+    begin_node(span, "UnaryExpr");
+    field("op", opText(value.op));
+    field("operand", value.operand);
+  }
+
+  void write_node(const Span& span, const BinaryExpr& value) {
+    begin_node(span, "BinaryExpr");
+    field("op", opText(value.op));
+    field("left", value.left);
+    field("right", value.right);
+  }
+
+  void write_node(const Span& span, const AssignExpr& value) {
+    begin_node(span, "AssignExpr");
+    field("op", opText(value.op));
+    field("left", value.left);
+    field("right", value.right);
+  }
+
+  void write_node(const Span& span, const CastExpr& value) {
+    begin_node(span, "CastExpr");
+    field("expression", value.expression);
+    field("type", value.type);
+  }
+
+  void write_node(const Span& span, const CallExpr& value) {
+    begin_node(span, "CallExpr");
+    field("callee", value.callee);
+    field("arguments", value.arguments);
+  }
+
+  void write_node(const Span& span, const MethodCallExpr& value) {
+    begin_node(span, "MethodCallExpr");
+    field("receiver", value.receiver);
+    field("method", value.method);
+    field("arguments", value.arguments);
+  }
+
+  void write_node(const Span& span, const FieldExpr& value) {
+    begin_node(span, "FieldExpr");
+    field("object", value.object);
+    field("name", value.name);
+  }
+
+  void write_node(const Span& span, const IndexExpr& value) {
+    begin_node(span, "IndexExpr");
+    field("object", value.object);
+    field("index", value.index);
+  }
+
+  void write_node(const Span& span, const StructExpr& value) {
+    begin_node(span, "StructExpr");
+    field("path", value.path);
+    field("fields", value.fields);
+  }
+
+  void write_node(const Span& span, const ArrayExpr& value) {
+    begin_node(span, "ArrayExpr");
+    field("elements", value.elements);
+  }
+
+  void write_node(const Span& span, const RepeatExpr& value) {
+    begin_node(span, "RepeatExpr");
+    field("element", value.element);
+    field("length", value.length);
+  }
+
+  void write_node(const Span& span, const BlockExpr& value) {
+    begin_node(span, "BlockExpr");
+    field("statements", value.statements);
+    field("tail", value.tail);
+  }
+
+  void write_node(const Span& span, const IfExpr& value) {
+    begin_node(span, "IfExpr");
+    field("condition", value.condition);
+    field("then_branch", value.then_branch);
+    field("else_branch", value.else_branch);
+  }
+
+  void write_node(const Span& span, const LoopExpr& value) {
+    begin_node(span, "LoopExpr");
+    field("body", value.body);
+  }
+
+  void write_node(const Span& span, const WhileExpr& value) {
+    begin_node(span, "WhileExpr");
+    field("condition", value.condition);
+    field("body", value.body);
+  }
+
+  void write_node(const Span& span, const BreakExpr& value) {
+    begin_node(span, "BreakExpr");
+    field("value", value.value);
+  }
+
+  void write_node(const Span& span, const ContinueExpr&) {
+    begin_node(span, "ContinueExpr");
+  }
+
+  void write_node(const Span& span, const ReturnExpr& value) {
+    begin_node(span, "ReturnExpr");
+    field("value", value.value);
+  }
+
+  void write_node(const Span& span, const LetStmt& value) {
+    begin_node(span, "LetStmt");
+    field("name", value.name);
+    field("is_mutable", value.is_mutable);
+    field("type", value.type);
+    field("init", value.init);
+  }
+
+  void write_node(const Span& span, const ExprStmt& value) {
+    begin_node(span, "ExprStmt");
+    field("expression", value.expression);
+    field("has_semicolon", value.has_semicolon);
+  }
+
+  void write_node(const Span& span, const EmptyStmt&) {
+    begin_node(span, "EmptyStmt");
+  }
+
+  void write_node(const Span& span, const FunctionItem& value) {
+    begin_node(span, "FunctionItem");
+    field("name", value.name);
+    field("receiver", value.receiver);
+    field("parameters", value.parameters);
+    field("return_type", value.return_type);
+    field("body", value.body);
+  }
+
+  void write_node(const Span& span, const StructItem& value) {
+    begin_node(span, "StructItem");
+    field("name", value.name);
+    field("derives", value.derives);
+    field("fields", value.fields);
+  }
+
+  void write_node(const Span& span, const ConstItem& value) {
+    begin_node(span, "ConstItem");
+    field("name", value.name);
+    field("type", value.type);
+    field("value", value.value);
+  }
+
+  void write_node(const Span& span, const ImplItem& value) {
+    begin_node(span, "ImplItem");
+    field("type", value.type);
+    field("items", value.items);
+  }
+
+  void write_node(const Span& span, const UseItem&) {
+    begin_node(span, "UseItem");
+  }
+};
+}
+
+void printAst(std::ostream& output, const Root& root, const std::string& file) {
+  Printer(output).print(root, file);
+}
+}

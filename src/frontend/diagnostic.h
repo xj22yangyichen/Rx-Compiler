@@ -4,7 +4,8 @@
 #include <string>
 
 namespace rx {
-struct Diagnostic {
+struct Diagnostic
+{
   std::string file;
   std::size_t line;
   std::size_t column;
