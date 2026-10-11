@@ -18,7 +18,6 @@ dev/
 .xmake/
 .idea/
 .vscode/
-.gitignore
 .clangd
 
 # AI
