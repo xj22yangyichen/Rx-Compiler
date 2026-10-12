@@ -1,11 +1,10 @@
 #pragma once
 
-#include <cstddef>
 #include <string>
+#include <cstddef>
 
 namespace rx {
-struct Diagnostic
-{
+struct Diagnostic {
   std::string file;
   std::size_t line;
   std::size_t column;

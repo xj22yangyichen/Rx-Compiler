@@ -1,11 +1,10 @@
 #pragma once
 
-#include "../ast/ast.h"
 #include "RxParser.h"
+#include "../ast/ast.h"
 
 namespace rx {
-class AstBuilder
-{
+class AstBuilder {
 public:
   // entrance of the ast builder
   ast::Root build_root(antlr4::ParserRuleContext* context);

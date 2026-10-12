@@ -1,6 +1,6 @@
 #include "ast-builder.h"
-#include <algorithm>
 #include <stdexcept>
+#include <algorithm>
 
 namespace rx {
 using namespace ast;
@@ -31,8 +31,7 @@ bool isOperator(Context* context) {
 }
 
 Op binaryOp(const std::string& text) {
-  for (auto value = static_cast<int>(Op::ADD); value <= static_cast<int>(Op::SHIFT_RIGHT_ASSIGN);
-    ++value) {
+  for (auto value = static_cast<int>(Op::ADD); value <= static_cast<int>(Op::SHIFT_RIGHT_ASSIGN); ++value) {
     auto op = static_cast<Op>(value);
     if (text == opText(op)) {
       return op;
@@ -85,8 +84,7 @@ PathSegment AstBuilder::build_segment(Context* context) {
   for (auto* child : context->children) {
     if (auto* name = dynamic_cast<RxParser::PathIdentSegmentContext*>(child)) {
       segment.name = name->getText();
-    }
-    else if (auto* args = dynamic_cast<RxParser::GenericArgsContext*>(child)) {
+    } else if (auto* args = dynamic_cast<RxParser::GenericArgsContext*>(child)) {
       for (auto* arg : args->genericArg()) {
         if (arg->typeRef()) {
           segment.arguments.push_back(build_type(arg->typeRef()));
@@ -102,8 +100,7 @@ Path AstBuilder::build_path(Context* context) {
   for (auto* child : context->children) {
     if (auto* segment = dynamic_cast<RxParser::TypePathSegmentContext*>(child)) {
       path.push_back(build_segment(segment));
-    }
-    else if (auto* segment = dynamic_cast<RxParser::PathExprSegmentContext*>(child)) {
+    } else if (auto* segment = dynamic_cast<RxParser::PathExprSegmentContext*>(child)) {
       path.push_back(build_segment(segment));
     }
   }
@@ -130,8 +127,7 @@ TypePtr AstBuilder::build_type(Context* context) {
     return makeNode<Type>(span, UnitType{});
   }
   if (auto* type = dynamic_cast<RxParser::ArrayTypeContext*>(context)) {
-    return makeNode<Type>(
-      span, ArrayType{build_type(type->typeRef()), build_expr(type->constValue())});
+    return makeNode<Type>(span, ArrayType{build_type(type->typeRef()), build_expr(type->constValue())});
   }
   if (auto* type = dynamic_cast<RxParser::ReferenceTypeContext*>(context)) {
     auto inner_span = span;
@@ -154,8 +150,7 @@ TypePtr AstBuilder::build_type(Context* context) {
     TypePtr result;
     if (type->typeRef()) {
       result = build_type(type->typeRef());
-    }
-    else {
+    } else {
       result = makeNode<Type>(span, UnitType{});
     }
     result->span = span;
@@ -205,10 +200,8 @@ ItemPtr AstBuilder::build_item(Context* context) {
       }
       for (auto* param : params->functionParam()) {
         auto* binding = param->identifierBinding();
-        value.parameters.push_back({sourceSpan(param),
-          binding->identifier()->getText(),
-          binding->MUT() != nullptr,
-          build_type(param->typeRef())});
+        value.parameters.push_back({sourceSpan(param), binding->identifier()->getText(),
+          binding->MUT() != nullptr, build_type(param->typeRef())});
       }
     }
     if (function->typeRef()) {
@@ -226,16 +219,14 @@ ItemPtr AstBuilder::build_item(Context* context) {
       }
     }
     for (auto* field : structure->structField()) {
-      value.fields.push_back(
-        {sourceSpan(field), field->identifier()->getText(), build_type(field->typeRef())});
+      value.fields.push_back({sourceSpan(field),
+        field->identifier()->getText(), build_type(field->typeRef())});
     }
     return makeNode<Item>(span, std::move(value));
   }
   if (auto* constant = dynamic_cast<RxParser::ConstantItemContext*>(context)) {
-    return makeNode<Item>(span,
-      ConstItem{constant->identifier()->getText(),
-        build_type(constant->typeRef()),
-        build_expr(constant->constValue())});
+    return makeNode<Item>(span, ConstItem{constant->identifier()->getText(),
+      build_type(constant->typeRef()), build_expr(constant->constValue())});
   }
   auto* impl = static_cast<RxParser::InherentImplContext*>(context);
   ImplItem value{build_type(impl->typeRef()), {}};
@@ -253,19 +244,16 @@ StmtPtr AstBuilder::build_stmt(Context* context) {
     if (binding->typeRef()) {
       type = build_type(binding->typeRef());
     }
-    return makeNode<Stmt>(span,
-      LetStmt{name->identifier()->getText(),
-        name->MUT() != nullptr,
-        std::move(type),
-        build_expr(binding->expression())});
+    return makeNode<Stmt>(span, LetStmt{name->identifier()->getText(),
+      name->MUT() != nullptr, std::move(type), build_expr(binding->expression())});
   }
   auto* statement = static_cast<RxParser::StatementContext*>(context);
   if (statement->letStatement()) {
     return build_stmt(statement->letStatement());
   }
   if (statement->expressionWithBlock()) {
-    return makeNode<Stmt>(
-      span, ExprStmt{build_expr(statement->expressionWithBlock()), statement->SEMI() != nullptr});
+    return makeNode<Stmt>(span,
+      ExprStmt{build_expr(statement->expressionWithBlock()), statement->SEMI() != nullptr});
   }
   if (statement->statementExpression()) {
     return makeNode<Stmt>(span, ExprStmt{build_expr(statement->statementExpression()), true});
@@ -280,8 +268,7 @@ ExprPtr AstBuilder::build_block(RxParser::BlockExpressionContext* context) {
   }
   if (context->statementExpression()) {
     value.tail = build_expr(context->statementExpression());
-  }
-  else if (!value.statements.empty()) {
+  } else if (!value.statements.empty()) {
     // ANTLR may represent a final block/if/loop as a semicolon-free statement.
     auto* last = std::get_if<ExprStmt>(&value.statements.back()->value);
     if (last && !last->has_semicolon) {
@@ -322,8 +309,7 @@ ExprPtr AstBuilder::build_literal(antlr4::Token* token) {
       value.digits.erase(0, 2);
     }
   }
-  value.digits.erase(
-    std::remove(value.digits.begin(), value.digits.end(), '_'), value.digits.end());
+  value.digits.erase(std::remove(value.digits.begin(), value.digits.end(), '_'), value.digits.end());
   return makeNode<Expr>(span, std::move(value));
 }
 
@@ -345,8 +331,7 @@ ExprPtr AstBuilder::build_chain(Context* context) {
     const auto op = binaryOp(operator_text);
     if (op >= Op::ASSIGN) {
       result = makeNode<Expr>(span, AssignExpr{op, std::move(result), std::move(right)});
-    }
-    else {
+    } else {
       result = makeNode<Expr>(span, BinaryExpr{op, std::move(result), std::move(right)});
     }
     operator_text.clear();
@@ -375,14 +360,11 @@ ExprPtr AstBuilder::build_unary(Context* context) {
   Op op = Op::BORROW_MUT;
   if (text == "-") {
     op = Op::NEGATE;
-  }
-  else if (text == "!") {
+  } else if (text == "!") {
     op = Op::NOT;
-  }
-  else if (text == "*") {
+  } else if (text == "*") {
     op = Op::DEREFERENCE;
-  }
-  else if (text == "&") {
+  } else if (text == "&") {
     op = Op::BORROW;
   }
   return makeNode<Expr>(span, UnaryExpr{op, std::move(operand)});
@@ -413,25 +395,20 @@ ExprPtr AstBuilder::build_postfix(Context* context) {
     const auto span = joinedSpan(result->span, sourceSpan(suffix));
     if (auto* postfix = dynamic_cast<RxParser::PostfixSuffixContext*>(suffix)) {
       if (postfix->callArguments()) {
-        result = makeNode<Expr>(
-          span, CallExpr{std::move(result), build_arguments(postfix->callArguments())});
+        result = makeNode<Expr>(span, CallExpr{std::move(result), build_arguments(postfix->callArguments())});
         continue;
       }
       if (postfix->expression()) {
-        result =
-          makeNode<Expr>(span, IndexExpr{std::move(result), build_expr(postfix->expression())});
+        result = makeNode<Expr>(span, IndexExpr{std::move(result), build_expr(postfix->expression())});
         continue;
       }
       suffix = postfix->dotSuffix();
     }
     auto* dot = static_cast<RxParser::DotSuffixContext*>(suffix);
     if (dot->callArguments()) {
-      result = makeNode<Expr>(span,
-        MethodCallExpr{std::move(result),
-          build_segment(dot->pathExprSegment()),
-          build_arguments(dot->callArguments())});
-    }
-    else {
+      result = makeNode<Expr>(span, MethodCallExpr{std::move(result),
+        build_segment(dot->pathExprSegment()), build_arguments(dot->callArguments())});
+    } else {
       result = makeNode<Expr>(span, FieldExpr{std::move(result), dot->identifier()->getText()});
     }
   }
@@ -471,9 +448,8 @@ ExprPtr AstBuilder::build_primary(Context* context) {
       return makeNode<Expr>(span, LoopExpr{build_expr(rule(context->children.at(1)))});
     }
     if (kind == RxParser::WHILE) {
-      return makeNode<Expr>(span,
-        WhileExpr{
-          build_expr(rule(context->children.at(1))), build_expr(rule(context->children.at(2)))});
+      return makeNode<Expr>(span, WhileExpr{
+        build_expr(rule(context->children.at(1))), build_expr(rule(context->children.at(2)))});
     }
     return makeNode<Expr>(span, UnaryExpr{Op::NEGATE, build_expr(rule(context->children.at(1)))});
   }
@@ -595,8 +571,7 @@ ExprPtr AstBuilder::build_expr(Context* context) {
       IfExpr value{build_expr(branch->conditionExpression()), build_block(blocks.at(0)), nullptr};
       if (branch->ifExpression()) {
         value.else_branch = build_expr(branch->ifExpression());
-      }
-      else if (blocks.size() > 1) {
+      } else if (blocks.size() > 1) {
         value.else_branch = build_block(blocks.at(1));
       }
       return makeNode<Expr>(sourceSpan(context), std::move(value));

@@ -1,8 +1,8 @@
-#include "frontend/frontend.h"
 #include "ast/ast-printer.h"
+#include "frontend/frontend.h"
+#include <string>
 #include <fstream>
 #include <iostream>
-#include <string>
 
 int main(int argc, char** argv) {
   rx::Stage stage = rx::Stage::PARSE;
@@ -14,27 +14,21 @@ int main(int argc, char** argv) {
       const std::string value = argv[++i];
       if (value == "lex") {
         stage = rx::Stage::LEX;
-      }
-      else if (value == "ast") {
+      } else if (value == "ast") {
         stage = rx::Stage::AST;
       }
-    }
-    else if (argument == "--entry") {
+    } else if (argument == "--entry") {
       const std::string value = argv[++i];
       if (value == "expression") {
         entry = rx::Entry::EXPRESSION;
-      }
-      else if (value == "typeRef") {
+      } else if (value == "typeRef") {
         entry = rx::Entry::TYPE;
-      }
-      else if (value == "item") {
+      } else if (value == "item") {
         entry = rx::Entry::ITEM;
-      }
-      else if (value == "letStatement") {
+      } else if (value == "letStatement") {
         entry = rx::Entry::LET_STATEMENT;
       }
-    }
-    else {
+    } else {
       file = argument;
     }
   }

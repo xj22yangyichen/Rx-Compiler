@@ -1,16 +1,13 @@
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <optional>
 #include <string>
-#include <utility>
-#include <variant>
 #include <vector>
+#include <memory>
+#include <variant>
+#include <optional>
 
 namespace rx::ast {
-struct Span
-{
+struct Span {
   std::size_t begin = 0;
   std::size_t end = 0;
   std::size_t line = 1;
@@ -38,8 +35,7 @@ enum class Op {
 };
 
 
-struct PathSegment
-{
+struct PathSegment {
   Span span;
   std::string name;
   std::vector<TypePtr> arguments;
@@ -47,40 +43,33 @@ struct PathSegment
 using Path = std::vector<PathSegment>;
 
 
-struct PathType
-{
+struct PathType {
   Path path;
 };
 
 
-struct RefType
-{
+struct RefType {
   bool is_mutable;
   TypePtr inner;
 };
 
 
-struct ArrayType
-{
+struct ArrayType {
   TypePtr element;
   ExprPtr length;
 };
 
 
-struct UnitType
-{
-};
+struct UnitType {};
 
 
-struct Type
-{
+struct Type {
   Span span;
   std::variant<PathType, RefType, ArrayType, UnitType> value;
 };
 
 
-struct IntegerExpr
-{
+struct IntegerExpr {
   std::string spelling;
   std::string digits;
   unsigned base;
@@ -88,157 +77,132 @@ struct IntegerExpr
 };
 
 
-struct BoolExpr
-{
+struct BoolExpr {
   bool is_true;
 };
 
 
-struct UnitExpr
-{
-};
+struct UnitExpr {};
 
 
-struct PathExpr
-{
+struct PathExpr {
   Path path;
 };
 
 
-struct UnaryExpr
-{
+struct UnaryExpr {
   Op op;
   ExprPtr operand;
 };
 
 
-struct BinaryExpr
-{
+struct BinaryExpr {
   Op op;
   ExprPtr left;
   ExprPtr right;
 };
 
 
-struct AssignExpr
-{
+struct AssignExpr {
   Op op;
   ExprPtr left;
   ExprPtr right;
 };
 
 
-struct CastExpr
-{
+struct CastExpr {
   ExprPtr expression;
   TypePtr type;
 };
 
 
-struct CallExpr
-{
+struct CallExpr {
   ExprPtr callee;
   std::vector<ExprPtr> arguments;
 };
 
 
-struct MethodCallExpr
-{
+struct MethodCallExpr {
   ExprPtr receiver;
   PathSegment method;
   std::vector<ExprPtr> arguments;
 };
 
 
-struct FieldExpr
-{
+struct FieldExpr {
   ExprPtr object;
   std::string name;
 };
 
 
-struct IndexExpr
-{
+struct IndexExpr {
   ExprPtr object;
   ExprPtr index;
 };
 
 
-struct FieldInit
-{
+struct FieldInit {
   Span span;
   std::string name;
   ExprPtr value;
 };
 
 
-struct StructExpr
-{
+struct StructExpr {
   Path path;
   std::vector<FieldInit> fields;
 };
 
 
-struct ArrayExpr
-{
+struct ArrayExpr {
   std::vector<ExprPtr> elements;
 };
 
 
-struct RepeatExpr
-{
+struct RepeatExpr {
   ExprPtr element;
   ExprPtr length;
 };
 
 
-struct BlockExpr
-{
+struct BlockExpr {
   std::vector<StmtPtr> statements;
   ExprPtr tail;
 };
 
 
-struct IfExpr
-{
+struct IfExpr {
   ExprPtr condition;
   ExprPtr then_branch;
   ExprPtr else_branch;
 };
 
 
-struct LoopExpr
-{
+struct LoopExpr {
   ExprPtr body;
 };
 
 
-struct WhileExpr
-{
+struct WhileExpr {
   ExprPtr condition;
   ExprPtr body;
 };
 
 
-struct BreakExpr
-{
+struct BreakExpr {
   ExprPtr value;
 };
 
 
-struct ContinueExpr
-{
-};
+struct ContinueExpr {};
 
 
-struct ReturnExpr
-{
+struct ReturnExpr {
   ExprPtr value;
 };
 
 
-struct Expr
-{
+struct Expr {
   Span span;
   std::variant<IntegerExpr, BoolExpr, UnitExpr, PathExpr, UnaryExpr,
     BinaryExpr, AssignExpr, CastExpr, CallExpr, MethodCallExpr, FieldExpr,
@@ -247,8 +211,7 @@ struct Expr
 };
 
 
-struct LetStmt
-{
+struct LetStmt {
   std::string name;
   bool is_mutable;
   TypePtr type;
@@ -256,35 +219,29 @@ struct LetStmt
 };
 
 
-struct ExprStmt
-{
+struct ExprStmt {
   ExprPtr expression;
   bool has_semicolon;
 };
 
 
-struct EmptyStmt
-{
-};
+struct EmptyStmt {};
 
 
-struct Stmt
-{
+struct Stmt {
   Span span;
   std::variant<LetStmt, ExprStmt, EmptyStmt> value;
 };
 
 
-struct Receiver
-{
+struct Receiver {
   Span span;
   bool is_reference;
   bool is_mutable;
 };
 
 
-struct Parameter
-{
+struct Parameter {
   Span span;
   std::string name;
   bool is_mutable;
@@ -292,8 +249,7 @@ struct Parameter
 };
 
 
-struct FunctionItem
-{
+struct FunctionItem {
   std::string name;
   std::optional<Receiver> receiver;
   std::vector<Parameter> parameters;
@@ -302,51 +258,43 @@ struct FunctionItem
 };
 
 
-struct StructField
-{
+struct StructField {
   Span span;
   std::string name;
   TypePtr type;
 };
 
 
-struct StructItem
-{
+struct StructItem {
   std::string name;
   std::vector<std::string> derives;
   std::vector<StructField> fields;
 };
 
 
-struct ConstItem
-{
+struct ConstItem {
   std::string name;
   TypePtr type;
   ExprPtr value;
 };
 
 
-struct ImplItem
-{
+struct ImplItem {
   TypePtr type;
   std::vector<ItemPtr> items;
 };
 
 
-struct UseItem
-{
-};
+struct UseItem {};
 
 
-struct Item
-{
+struct Item {
   Span span;
   std::variant<FunctionItem, StructItem, ConstItem, ImplItem, UseItem> value;
 };
 
 
-struct Crate
-{
+struct Crate {
   Span span;
   std::vector<ItemPtr> items;
 };

@@ -1,6 +1,6 @@
+#include "ast-builder.h"
 #include "frontend.h"
 #include "error-listener.h"
-#include "ast-builder.h"
 #include "RxLexer.h"
 #include "RxParser.h"
 
@@ -36,11 +36,9 @@ FrontendResult check(std::istream& source, const std::string& file, Stage stage,
   antlr4::CommonTokenStream tokens(&lexer);
   tokens.fill();
 
-  // These rules successfully match invalid input, so no lexer callback fires.
   for (auto* token : tokens.getTokens()) {
     if (const auto* message = invalidToken(token->getType())) {
-      diagnostics.push_back(
-        {file, token->getLine(), token->getCharPositionInLine() + 1, "lex", message});
+      diagnostics.push_back({file, token->getLine(), token->getCharPositionInLine() + 1, "lex", message});
     }
   }
   if (!diagnostics.empty() || stage == Stage::LEX) {
@@ -70,16 +68,13 @@ FrontendResult check(std::istream& source, const std::string& file, Stage stage,
       break;
   }
 
-  // Fragment rules do not consume EOF: reject any unparsed suffix.
   if (diagnostics.empty() && tokens.LA(1) != antlr4::Token::EOF) {
     auto* token = tokens.LT(1);
-    diagnostics.push_back({file,
-      token->getLine(),
-      token->getCharPositionInLine() + 1,
-      "parse",
-      "unexpected trailing input"});
+    diagnostics.push_back({file, token->getLine(), token->getCharPositionInLine() + 1,
+      "parse", "unexpected trailing input"});
   }
-  // Error recovery can return a tree; acceptance depends on diagnostics, not the tree.
+  // Error recovery of ANTLR can generate a CST even if the code is invalid,
+  // so acceptance depends on diagnostics, not the CST.
   if (diagnostics.empty() && stage == Stage::AST) {
     result.tree = AstBuilder().build_root(tree);
   }
