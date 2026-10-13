@@ -2,7 +2,17 @@
 
 Rx 语言编译器，ACM 班编译器课程项目。Rx 是 Rust 2021 的一个子集，编译目标为 RISC-V RV32IM 汇编，在 [REIMU](https://github.com/wanoful/REIMU) 模拟器上运行。本项目使用 C++17 实现。
 
-语言规范见 [specification/](specification/)（mdBook，可本地构建），中文翻译见 [specification-zh/](specification-zh/)。官方测试用例见 [testcases/](testcases/)。
+语言规范见 [specification/](specification/)，中文翻译见 [specification-zh/](specification-zh/)。官方测试用例见 [tests/official/](tests/official/)。
+
+中文版规范预览：先运行命令
+
+```sh
+make -C specification-zh serve
+```
+
+然后访问 http://127.0.0.1:3000/。
+
+英文版规范在线预览：[Rx Compiler Specification](https://acmclasscourse-2025.github.io/rx-compiler-specification/)。
 
 ## 项目进度
 

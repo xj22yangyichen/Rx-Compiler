@@ -14,13 +14,13 @@
 
 ## 构建与预览
 
-如需在本地使用，请克隆本仓库，并使用 `mdbook` 构建规范。运行以下命令前，请先进入本目录（`specification-zh/`）。
+如需在本地使用，请克隆本仓库，并使用 `mdbook` 构建规范。以下命令假设当前目录为本目录（`specification-zh/`）。
 
 本书使用 mdBook 0.4.x（CI 固定为 0.4.48）以及随附的 `mdbook-spec` 预处理器。
 
 ```sh
 cargo install --locked mdbook --version 0.4.48
-SPEC_RELATIVE=0 SPEC_DENY_WARNINGS=1 mdbook build
+make build
 ```
 
 生成的网站将写入 `book/`。如需本地预览：
@@ -29,7 +29,28 @@ SPEC_RELATIVE=0 SPEC_DENY_WARNINGS=1 mdbook build
 make serve
 ```
 
-默认地址为 http://127.0.0.1:3000/。也可以通过 `HOST` 和 `PORT` 覆盖监听地址和端口，例如 `make serve HOST=0.0.0.0 PORT=4000`。
+预览服务启动后，在浏览器中访问 http://127.0.0.1:3000/。`make serve` 会持续运行并监视文件变化；关闭该命令后，本地预览地址将不可访问。
+
+如果当前位于仓库根目录，或者不想手动进入 `specification-zh/`，可以使用 `make -C`：
+
+```sh
+make -C specification-zh build
+make -C specification-zh serve
+```
+
+在任意目录中也可以使用本目录的绝对路径：
+
+```sh
+make -C "/home/yangyichen/code/Rx Compiler/specification-zh" serve
+```
+
+也可以通过 `HOST` 和 `PORT` 覆盖监听地址和端口，例如：
+
+```sh
+make -C specification-zh serve HOST=0.0.0.0 PORT=4000
+```
+
+此时请访问 http://127.0.0.1:4000/。每次重启电脑后，如需使用本地预览，需要重新启动 `make serve` 或对应的 `make -C ... serve` 命令。
 
 <a id="issues-and-contributing"></a>
 
