@@ -1,0 +1,207 @@
+[
+  {
+    "name": "invalid-number",
+    "source": "0b102",
+    "stage": "lex",
+    "exit": 1,
+    "contains": ["invalid-number.rx:1:1: lex error: invalid integer literal"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "invalid-lifetime",
+    "source": "'fn",
+    "stage": "lex",
+    "exit": 1,
+    "contains": [":1:1: lex error: invalid lifetime token"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "character-literal",
+    "source": "'x'",
+    "stage": "lex",
+    "exit": 1,
+    "contains": [":1:1: lex error: unsupported character literal"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "unterminated-nested-comment",
+    "source": "/* outer /* inner */",
+    "stage": "lex",
+    "exit": 1,
+    "contains": [":1:1: lex error: unterminated block comment"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "unexpected-character",
+    "source": "\n  @",
+    "stage": "lex",
+    "exit": 1,
+    "contains": [":2:3: lex error: unrecognized character"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "trailing-invalid-token",
+    "source": "fn main() {}\n@",
+    "stage": "parse",
+    "exit": 1,
+    "contains": [":2:1: lex error: unrecognized character"],
+    "excludes": ["parse error:"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "no-parser-cascade",
+    "source": "fn main() { let x = 0b102; }",
+    "stage": "parse",
+    "exit": 1,
+    "contains": [":1:21: lex error: invalid integer literal"],
+    "excludes": ["parse error:"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "multiple-lex-errors",
+    "source": "@\n0xG",
+    "stage": "lex",
+    "exit": 1,
+    "contains": [":1:1: lex error: unrecognized character", ":2:1: lex error: invalid integer literal"],
+    "diagnostic_count": 2
+  },
+  {
+    "name": "punctuation-mode-invalid",
+    "source": ">0b102",
+    "stage": "lex",
+    "exit": 1,
+    "contains": [":1:2: lex error: invalid integer literal"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "second-punctuation-mode-invalid",
+    "source": ">>@",
+    "stage": "lex",
+    "exit": 1,
+    "contains": [":1:3: lex error: unrecognized character"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "recovered-missing-semicolon",
+    "source": "fn main() {\n    let x = 1\n}\n",
+    "stage": "parse",
+    "exit": 1,
+    "contains": [":3:1: parse error:", "missing ';'"],
+    "excludes": ["lex error:"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "multiple-parser-errors",
+    "source": "fn first() { let a = 1 }\nfn second() { let b = 2 }\n",
+    "stage": "parse",
+    "exit": 1,
+    "contains": [":1:24: parse error:", ":2:25: parse error:"],
+    "diagnostic_count": 2
+  },
+  {
+    "name": "trailing-valid-token",
+    "source": "fn main() {} 123",
+    "stage": "parse",
+    "exit": 1,
+    "contains": [":1:14: parse error:"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "syntax-only",
+    "source": "fn main() { let x: bool = 123; missing(); }",
+    "stage": "parse",
+    "exit": 0
+  },
+  {
+    "name": "lex-does-not-parse",
+    "source": "fn main( { let x = ;",
+    "stage": "lex",
+    "exit": 0
+  },
+  {
+    "name": "empty-source",
+    "source": "",
+    "stage": "parse",
+    "exit": 0
+  },
+  {
+    "name": "nested-comment",
+    "source": "/* outer /* inner */ end */ fn main() {}",
+    "stage": "parse",
+    "exit": 0
+  },
+  {
+    "name": "fragment-expression",
+    "source": "1 + 2 * 3",
+    "stage": "parse",
+    "entry": "expression",
+    "exit": 0
+  },
+  {
+    "name": "fragment-type",
+    "source": "Vec<Box<i32>>",
+    "stage": "parse",
+    "entry": "typeRef",
+    "exit": 0
+  },
+  {
+    "name": "fragment-trailing-expression",
+    "source": "1 2",
+    "stage": "parse",
+    "entry": "expression",
+    "exit": 1,
+    "contains": [":1:3: parse error: unexpected trailing input"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "fragment-trailing-type",
+    "source": "i32 i32",
+    "stage": "parse",
+    "entry": "typeRef",
+    "exit": 1,
+    "contains": [":1:5: parse error: unexpected trailing input"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "fragment-trailing-item",
+    "source": "fn a() {} fn b() {}",
+    "stage": "parse",
+    "entry": "item",
+    "exit": 1,
+    "contains": [":1:11: parse error: unexpected trailing input"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "fragment-trailing-let",
+    "source": "let x = 1; let y = 2;",
+    "stage": "parse",
+    "entry": "letStatement",
+    "exit": 1,
+    "contains": [":1:12: parse error: unexpected trailing input"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "fragment-recovery",
+    "source": "let x = 1",
+    "stage": "parse",
+    "entry": "letStatement",
+    "exit": 1,
+    "contains": [":1:10: parse error:", "missing ';'"],
+    "diagnostic_count": 1
+  },
+  {
+    "name": "default-rejects-fragment",
+    "source": "1 + 2",
+    "stage": "parse",
+    "exit": 1,
+    "contains": [":1:1: parse error:"]
+  },
+  {
+    "name": "crlf-location",
+    "source": "fn main() {}\r\n  @",
+    "stage": "parse",
+    "exit": 1,
+    "contains": [":2:3: lex error: unrecognized character"],
+    "diagnostic_count": 1
+  }
+]

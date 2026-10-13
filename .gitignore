@@ -13,6 +13,7 @@ __pycache__/
 # Local files
 dev/
 *.local.*
+scheme.txt
 
 # hidden files
 .xmake/
@@ -24,7 +25,3 @@ dev/
 .claude/
 .cc-history/
 CLAUDE.md
-
-# tests
-/tests/custom/
-/scripts

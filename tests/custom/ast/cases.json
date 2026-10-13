@@ -1,0 +1,164 @@
+[
+  {
+    "name": "precedence",
+    "entry": "expression",
+    "source": "a + b * c",
+    "expect": {"kind": "BinaryExpr", "op": "+", "left": {"kind": "PathExpr"}, "right": {"kind": "BinaryExpr", "op": "*"}}
+  },
+  {
+    "name": "left-association",
+    "entry": "expression",
+    "source": "a - b - c",
+    "expect": {"kind": "BinaryExpr", "op": "-", "left": {"kind": "BinaryExpr", "op": "-"}, "right": {"kind": "PathExpr"}}
+  },
+  {
+    "name": "right-assignment",
+    "entry": "expression",
+    "source": "a = b += c",
+    "expect": {"kind": "AssignExpr", "op": "=", "left": {"kind": "PathExpr"}, "right": {"kind": "AssignExpr", "op": "+="}}
+  },
+  {
+    "name": "double-borrow",
+    "entry": "expression",
+    "source": "&&mut x",
+    "expect": {"kind": "UnaryExpr", "op": "&", "operand": {"kind": "UnaryExpr", "op": "&mut", "operand": {"kind": "PathExpr"}}}
+  },
+  {
+    "name": "double-reference-type",
+    "entry": "typeRef",
+    "source": "&&'a mut Vec<Box<i32>>",
+    "expect": {"kind": "RefType", "is_mutable": false, "inner": {"kind": "RefType", "is_mutable": true, "inner": {"kind": "PathType", "path": [{"name": "Vec", "arguments": [{"kind": "PathType", "path": [{"name": "Box", "arguments": [{"kind": "PathType", "path": [{"name": "i32", "arguments": []}]}]}]}]}]}}}
+  },
+  {
+    "name": "postfix-chain",
+    "entry": "expression",
+    "source": "S::new().field[1].method::<u32>(2)",
+    "expect": {"kind": "MethodCallExpr", "method": {"name": "method", "arguments": [{"kind": "PathType"}]}, "receiver": {"kind": "IndexExpr", "object": {"kind": "FieldExpr", "name": "field", "object": {"kind": "CallExpr", "callee": {"path": [{"name": "S"}, {"name": "new"}]}}}}, "arguments": [{"kind": "IntegerExpr", "digits": "2"}]}
+  },
+  {
+    "name": "block-dot-suffix",
+    "entry": "expression",
+    "source": "{ let x = { S { field: 1 } }.field; x }",
+    "expect": {"kind": "BlockExpr", "statements": [{"kind": "LetStmt", "init": {"kind": "FieldExpr", "object": {"kind": "BlockExpr", "tail": {"kind": "StructExpr"}}}}], "tail": {"kind": "PathExpr"}}
+  },
+  {
+    "name": "if-tail",
+    "entry": "expression",
+    "source": "{ if flag { 1 } else { 2 } }",
+    "expect": {"kind": "BlockExpr", "statements": [], "tail": {"kind": "IfExpr", "then_branch": {"tail": {"digits": "1"}}, "else_branch": {"tail": {"digits": "2"}}}}
+  },
+  {
+    "name": "semicolon-removes-tail",
+    "entry": "expression",
+    "source": "{ if flag { 1 } else { 2 }; }",
+    "expect": {"kind": "BlockExpr", "statements": [{"kind": "ExprStmt", "has_semicolon": true, "expression": {"kind": "IfExpr"}}], "tail": null}
+  },
+  {
+    "name": "empty-statement-after-block",
+    "entry": "expression",
+    "source": "{ if flag {} ;; }",
+    "expect": {"kind": "BlockExpr", "statements": [{"kind": "ExprStmt", "has_semicolon": true}, {"kind": "EmptyStmt"}], "tail": null}
+  },
+  {
+    "name": "non-tail-block",
+    "entry": "expression",
+    "source": "{ if flag {} let x = 1; x }",
+    "expect": {"kind": "BlockExpr", "statements": [{"kind": "ExprStmt", "has_semicolon": false}, {"kind": "LetStmt"}], "tail": {"kind": "PathExpr"}}
+  },
+  {
+    "name": "loop-break-value",
+    "entry": "expression",
+    "source": "loop { break 4; }",
+    "expect": {"kind": "LoopExpr", "body": {"kind": "BlockExpr", "tail": null, "statements": [{"expression": {"kind": "BreakExpr", "value": {"digits": "4"}}}]}}
+  },
+  {
+    "name": "while-jumps",
+    "entry": "expression",
+    "source": "while x > 0 { continue; break; return; }",
+    "expect": {"kind": "WhileExpr", "condition": {"op": ">"}, "body": {"statements": [{"expression": {"kind": "ContinueExpr"}}, {"expression": {"kind": "BreakExpr", "value": null}}, {"expression": {"kind": "ReturnExpr", "value": null}}]}}
+  },
+  {
+    "name": "else-if",
+    "entry": "expression",
+    "source": "if a { 1 } else if b { 2 } else { 3 }",
+    "expect": {"kind": "IfExpr", "else_branch": {"kind": "IfExpr", "else_branch": {"tail": {"digits": "3"}}}}
+  },
+  {
+    "name": "arrays",
+    "entry": "expression",
+    "source": "[[1, 2], [make(); N]]",
+    "expect": {"kind": "ArrayExpr", "elements": [{"kind": "ArrayExpr", "elements": [{"digits": "1"}, {"digits": "2"}]}, {"kind": "RepeatExpr", "element": {"kind": "CallExpr"}, "length": {"kind": "PathExpr"}}]}
+  },
+  {
+    "name": "array-type",
+    "entry": "typeRef",
+    "source": "[&mut i32; COUNT]",
+    "expect": {"kind": "ArrayType", "element": {"kind": "RefType", "is_mutable": true}, "length": {"path": [{"name": "COUNT"}]}}
+  },
+  {
+    "name": "signed-minimum",
+    "entry": "expression",
+    "source": "-(2147483648i32)",
+    "expect": {"kind": "UnaryExpr", "op": "-", "operand": {"kind": "IntegerExpr", "digits": "2147483648", "suffix": "i32", "base": 10}}
+  },
+  {
+    "name": "numeric-spellings",
+    "entry": "expression",
+    "source": "[0xff_u32, 0b10_01, 0o7_7usize, 12_3isize, 99999999999999999999999999999999999999]",
+    "expect": {"elements": [{"digits": "ff", "base": 16, "suffix": "u32", "spelling": "0xff_u32"}, {"digits": "1001", "base": 2, "suffix": ""}, {"digits": "77", "base": 8, "suffix": "usize"}, {"digits": "123", "base": 10, "suffix": "isize"}, {"digits": "99999999999999999999999999999999999999"}]}
+  },
+  {
+    "name": "constant-grouping",
+    "entry": "item",
+    "source": "const MIN: i32 = -(2147483648i32);",
+    "expect": {"kind": "ConstItem", "name": "MIN", "type": {"kind": "PathType"}, "value": {"kind": "UnaryExpr", "op": "-", "operand": {"digits": "2147483648"}}}
+  },
+  {
+    "name": "closed-cast-comparison",
+    "entry": "expression",
+    "source": "x as (u32) < y",
+    "expect": {"kind": "BinaryExpr", "op": "<", "left": {"kind": "CastExpr", "type": {"path": [{"name": "u32"}]}}}
+  },
+  {
+    "name": "closed-generic-cast",
+    "entry": "expression",
+    "source": "x as S::T::<i32> << y",
+    "expect": {"kind": "BinaryExpr", "op": "<<", "left": {"kind": "CastExpr", "type": {"path": [{"name": "S", "arguments": []}, {"name": "T", "arguments": [{"path": [{"name": "i32"}]}]}]}}}
+  },
+  {
+    "name": "closed-reference-cast",
+    "entry": "expression",
+    "source": "x as &&mut (u32) < y",
+    "expect": {"kind": "BinaryExpr", "op": "<", "left": {"kind": "CastExpr", "type": {"kind": "RefType", "is_mutable": false, "inner": {"kind": "RefType", "is_mutable": true}}}}
+  },
+  {
+    "name": "cast-chain",
+    "entry": "expression",
+    "source": "x as u32 as i32",
+    "expect": {"kind": "CastExpr", "expression": {"kind": "CastExpr"}, "type": {"path": [{"name": "i32"}]}}
+  },
+  {
+    "name": "type-closers-before-equals",
+    "entry": "letStatement",
+    "source": "let mut xs: Vec<Vec<i32>>=Vec::<Vec<i32>>::new();",
+    "expect": {"kind": "LetStmt", "name": "xs", "is_mutable": true, "type": {"kind": "PathType"}, "init": {"kind": "CallExpr", "callee": {"path": [{"name": "Vec", "arguments": [{"path": [{"name": "Vec", "arguments": [{"path": [{"name": "i32"}]}]}]}]}, {"name": "new", "arguments": []}]}}}
+  },
+  {
+    "name": "items-and-lifetimes",
+    "entry": "crate",
+    "source": "use rx::core::*;\n#[derive(Clone, Copy)] struct S<'a> { p: &'a i32 }\nimpl<'a> S<'a> where 'a: 'a { const N: i32 = 1; fn f(&'a mut self, mut x: i32) -> () { return; } }",
+    "expect": {"kind": "Crate", "items": [{"kind": "UseItem"}, {"kind": "StructItem", "name": "S", "derives": ["Clone", "Copy"], "fields": [{"name": "p", "type": {"kind": "RefType", "is_mutable": false}}]}, {"kind": "ImplItem", "type": {"path": [{"name": "S", "arguments": []}]}, "items": [{"kind": "ConstItem", "name": "N"}, {"kind": "FunctionItem", "name": "f", "receiver": {"is_reference": true, "is_mutable": true}, "parameters": [{"name": "x", "is_mutable": true}], "return_type": {"kind": "UnitType"}}]}]}
+  },
+  {
+    "name": "implicit-return-type",
+    "entry": "item",
+    "source": "fn f(mut self) { () }",
+    "expect": {"kind": "FunctionItem", "receiver": {"is_reference": false, "is_mutable": true}, "parameters": [], "return_type": null, "body": {"tail": {"kind": "UnitExpr"}}}
+  },
+  {
+    "name": "source-spans",
+    "entry": "expression",
+    "source": "\n  a + b",
+    "expect": {"span": {"begin": 3, "end": 8, "line": 2, "column": 3}, "left": {"span": {"begin": 3, "end": 4, "column": 3}}, "right": {"span": {"begin": 7, "end": 8, "column": 7}}}
+  }
+]

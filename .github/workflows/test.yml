@@ -1,0 +1,46 @@
+name: Tests
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install g++-14
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14
+
+      - name: Install ANTLR 4.13.2
+        run: |
+          mkdir -p "$HOME/.local/lib" "$HOME/.local/src"
+          curl -fsSL -o "$HOME/.local/lib/antlr-4.13.2-complete.jar" \
+            https://www.antlr.org/download/antlr-4.13.2-complete.jar
+          curl -fsSL -o /tmp/antlr4-cpp-runtime.zip \
+            https://www.antlr.org/download/antlr4-cpp-runtime-4.13.2-source.zip
+          unzip -q /tmp/antlr4-cpp-runtime.zip -d "$HOME/.local/src/antlr4-cpp"
+          cmake -S "$HOME/.local/src/antlr4-cpp" -B "$HOME/.local/src/antlr4-cpp/build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER=g++-14 \
+            -DCMAKE_INSTALL_PREFIX="$HOME/.local" \
+            -DANTLR_BUILD_CPP_TESTS=OFF \
+            -DWITH_DEMO=OFF
+          cmake --build "$HOME/.local/src/antlr4-cpp/build" -j"$(nproc)"
+          cmake --install "$HOME/.local/src/antlr4-cpp/build"
+
+      - name: Build rxc
+        run: |
+          cmake -S . -B target/frontend -DCMAKE_CXX_COMPILER=g++-14
+          cmake --build target/frontend -j"$(nproc)"
+
+      - name: Run frontend tests
+        run: python3 scripts/test-frontend.py --parse-regressions
+
+      - name: Run AST tests
+        run: python3 scripts/test-ast.py
