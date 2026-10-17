@@ -46,5 +46,17 @@
     "stage": "semantic",
     "compilation_success": false,
     "description": "A condition cannot jump to an outer loop."
+  },
+  {
+    "source": "acc-divergent-loop-body-without-tail.rx",
+    "stage": "semantic",
+    "compilation_success": true,
+    "description": "Divergent loop body without a tail expression has never type and is compatible with unit."
+  },
+  {
+    "source": "rej-loop-body-with-unreachable-non-unit-tail.rx",
+    "stage": "semantic",
+    "compilation_success": false,
+    "description": "Loop body with an unreachable non-unit tail expression must be rejected."
   }
 ]

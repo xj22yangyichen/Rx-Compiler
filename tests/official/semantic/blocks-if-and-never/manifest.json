@@ -34,5 +34,11 @@
     "stage": "semantic",
     "compilation_success": false,
     "description": "A unit function cannot return an integer."
+  },
+  {
+    "source": "acc-divergent-block-without-tail-statement.rx",
+    "stage": "semantic",
+    "compilation_success": true,
+    "description": "A block without a tail expression whose inner statement diverges has never type."
   }
 ]
