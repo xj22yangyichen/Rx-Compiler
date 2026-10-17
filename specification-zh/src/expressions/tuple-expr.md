@@ -14,5 +14,5 @@ fn log_status() {
     // 隐式求值为 ()
 }
 
-let result = log_status();      // result 求值为单元值 ()
+log_status();                    // 求值为单元值 () 并丢弃该值
 ```

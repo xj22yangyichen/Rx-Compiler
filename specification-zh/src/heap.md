@@ -119,7 +119,7 @@ fn boxed_vector_reference(values: Box<&mut Vec<&mut i32>>) {
 | `Box<T>` | `fn clone(&self) -> Box<T>` | 将存储的 `T` 克隆到独立拥有的存储中。 |
 | `Vec<T>` | `fn clone(&self) -> Vec<T>` | 按顺序克隆元素，得到长度相同的独立向量。 |
 
-拥有所有权的嵌套容器会递归克隆；共享引用只复制引用，不克隆其目标。`Clone` 能力在[内建 Trait](builtin-traits.md#clone) 中规定。点调用仍受[竞争方法排除规则](expressions/method-call-expr.md#method-lookup)约束：例如，使用 `Box::<i32>::clone(&boxed)` 显式选择 box 的克隆方法。
+拥有所有权的嵌套容器会递归克隆；共享引用只复制引用，不克隆其目标。`Clone` 能力在[内建 Trait](builtin-traits.md#clone) 中规定。如果多个方法匹配同一个候选接收者类型，点调用仍受[竞争方法排除规则](expressions/method-call-expr.md#method-lookup)约束。像 `Box::<i32>::clone(&boxed)` 这样的完全限定调用会直接选择容器操作，不经过方法查找。
 
 `Box` 的相等性比较存储的值。`Vec` 的相等性比较长度及对应元素，忽略分配地址、容量和填充。这些操作可与结构体派生以及递归类型的有限值组合使用。
 

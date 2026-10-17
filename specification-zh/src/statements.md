@@ -28,7 +28,11 @@ ExpressionStatement ->
 
 表达式语句对表达式求值并丢弃结果，同时保留其副作用。空的 `;` 语句没有效果。
 
-[ExpressionWithoutBlock] 要求分号。[ExpressionWithBlock]（`{ ... }`、`if`、`while` 或 `loop`）可以省略分号。省略分号时，表达式的求值类型必须与单元类型 `()` 兼容，或者表达式必须发散。块的最终表达式遵循[尾表达式规则](expressions/block-expr.md)。
+[ExpressionWithoutBlock] 要求分号。[ExpressionWithBlock]（`{ ... }`、`if`、`while` 或 `loop`）可以省略分号。
+
+当 [ExpressionWithBlock] 作为语句使用时（其结果会被丢弃），省略分号要求其求值类型与单元类型 `()` 兼容。
+
+相反，当不带分号的 [ExpressionWithBlock] 位于块的最终位置时，它作为该块的尾表达式，而不是表达式语句；它遵循[尾表达式规则](expressions/block-expr.md)，并且可以求值得到任意类型。
 
 ```rust,ignore
 fn show(flag: bool) {
