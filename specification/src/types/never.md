@@ -1,11 +1,11 @@
 # Never type
 
 The never type, conventionally written `!`, describes expressions that do not
-complete normally. It is used internally; `!` is not a valid source type
-annotation.
+complete normally; such expressions are said to *diverge*. It is used internally;
+`!` is not a valid source type annotation.
 
 `return`, `break`, and `continue` expressions have the never type: they transfer
-control instead of producing a value where they appear. A [block expression](../expressions/block-expr.md) whose execution paths all exit early through these transfers likewise has the never type.
+control instead of producing a value where they appear. A [block expression](../expressions/block-expr.md) without a tail expression whose execution paths all exit early through these transfers or by evaluating diverging expressions likewise has the never type. If a block has a tail expression, that expression determines the block's type even if prior statements diverge.
 
 The never type can coerce to any expected result type in the supported [coercion contexts](../types.md#conversions-and-coercions).
 Without an expected type, never results do not constrain the other results' common type; if all results are never, that common type is never. This permits an if branch to return early while another branch yields a value, including a reference or container.

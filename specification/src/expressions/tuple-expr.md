@@ -13,5 +13,5 @@ fn log_status() {
     // implicitly evaluates to ()
 }
 
-let result = log_status();      // result evaluates to the unit value ()
+log_status();                    // evaluates to the unit value () and discards it
 ```

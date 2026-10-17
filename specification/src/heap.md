@@ -141,7 +141,7 @@ When `T` is `Clone`, the containers support these builtin `Clone` methods:
 
 Owned nested containers clone recursively; shared references are copied without
 cloning their targets. The `Clone` capability is specified in [Builtin traits](builtin-traits.md#clone).
-Dot calls remain subject to the [competing-method exclusion](expressions/method-call-expr.md#method-lookup): for example, use `Box::<i32>::clone(&boxed)` to select the box's clone explicitly.
+Dot calls remain subject to the [competing-method exclusion](expressions/method-call-expr.md#method-lookup) if multiple methods match the same candidate receiver type. A fully qualified call such as `Box::<i32>::clone(&boxed)` selects the container operation directly without method lookup.
 
 `Box` equality compares stored values. `Vec` equality compares length and corresponding elements, ignoring allocation address, capacity, and padding. These operations compose with struct derives and finite values of recursive types.
 

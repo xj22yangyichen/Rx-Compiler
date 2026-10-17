@@ -13,5 +13,5 @@ fn do_nothing() -> () {
     // A function with an omitted or () return type returns ()
 }
 
-let unit_val: () = ();           // Unit literal
+();                              // Unit literal
 ```

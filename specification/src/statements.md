@@ -30,10 +30,16 @@ An expression statement evaluates an expression and discards its result while
 preserving its effects. An empty `;` statement has no effect.
 
 [ExpressionWithoutBlock] requires a semicolon. [ExpressionWithBlock]
-(`{ ... }`, `if`, `while`, or `loop`) may omit it. When the semicolon is omitted,
-the expression's evaluated type must be compatible with the unit type `()`, or
-the expression must diverge. A block's final expression follows the
-[tail-expression rules](expressions/block-expr.md).
+(`{ ... }`, `if`, `while`, or `loop`) may omit it.
+
+When an [ExpressionWithBlock] is used as a statement (where its result is discarded),
+omitting the semicolon requires its evaluated type to be compatible with the unit
+type `()`.
+
+In contrast, when an [ExpressionWithBlock] without a semicolon appears as the final
+expression of a block, it serves as the block's tail expression rather than an
+expression statement; it is governed by the [tail-expression rules](expressions/block-expr.md)
+and may evaluate to any type.
 
 ```rust,ignore
 fn show(flag: bool) {

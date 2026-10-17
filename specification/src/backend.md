@@ -164,7 +164,7 @@ REIMU also provides psABI-compatible `memcpy`, `memmove`, and `memset`. Use `mem
 
 Tests run with 256 MiB total execution memory and a 1 MiB stack.
 
-<!-- 
+<!--
 
 The 64 MiB value is test headroom, not a source-visible heap size or a guarantee that one allocation of that size succeeds. Text, static data, stack, and heap share the 256 MiB execution limit. No separate static-data limit applies.
 

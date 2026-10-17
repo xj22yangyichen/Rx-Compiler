@@ -64,7 +64,7 @@ The table defines the complete builtin operand combinations for these operations
 
 All supported integers have 32 bits. Runtime addition, subtraction, multiplication, and signed negation wrap using two's-complement arithmetic, as with Rust overflow checks disabled. Optimized and unoptimized code have the same behavior. LLVM overflow flags must not assert non-overflow unless the compiler has proved it for the particular operation.
 
-Signed division truncates toward zero; a nonzero remainder has the sign of the dividend. Division or remainder operations where the divisor is zero, or where the signed minimum integer (`i32::MIN`) is divided or reduced modulo -1, are excluded from valid executions. No check or panic runtime is required.
+Signed division truncates toward zero; a nonzero remainder has the sign of the dividend. Division or remainder operations where the divisor is zero, or where the signed minimum integer (`-2147483648i32`) is divided or reduced modulo -1, are excluded from valid executions. No check or panic runtime is required.
 
 Shifts accept integer operands whose types may differ. The result has the left operand's type. At runtime, shift amounts are masked to their least significant 5 bits. Signed right shift is arithmetic; unsigned right shift is logical. This masking also applies to constant-folded ordinary expressions.
 
