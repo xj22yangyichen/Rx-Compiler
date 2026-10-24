@@ -3,14 +3,11 @@
 # Optional: build your compiler once before testing. Leave empty if prebuilt.
 # {runtime} will be linked into every program.
 # Write shared runtime assembly there if your IR/CODEGEN output references it.
-BUILD = CARGO_PROFILE_RELEASE_LTO=true cargo build --quiet --locked --release \
-    --manifest-path crates/rx/Cargo.toml \
-    --target-dir target/reference \
-    --target riscv32im-unknown-none-elf && : > {runtime}
+BUILD = cmake -S . -B target/frontend -DCMAKE_CXX_COMPILER=g++-14 && \
+    cmake --build target/frontend -j2 && : > {runtime}
 
 # Required for semantic tests: exit 0 to accept {source}, 1 to reject it.
-SEMANTIC = RX_SOURCE={source} $(REFERENCE_RUSTC) --cfg rx_semantic \
-    --emit=metadata crates/rx/src/entry.rs -o {output}
+SEMANTIC = ./target/frontend/rxc --stage semantic {source}
 
 # Required for IR tests: write RV32 LLVM IR to {output} (.ll).
 IR = RUST_MIN_STACK=16777216 RX_SOURCE={source} $(REFERENCE_RUSTC) --crate-type=staticlib \

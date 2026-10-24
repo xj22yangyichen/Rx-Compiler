@@ -1,8 +1,9 @@
-#include "ast-builder.h"
-#include "frontend.h"
-#include "error-listener.h"
 #include "RxLexer.h"
+#include "frontend.h"
 #include "RxParser.h"
+#include "ast-builder.h"
+#include "error-listener.h"
+#include "../sema/analyzer.h"
 
 namespace rx {
 namespace {
@@ -38,7 +39,8 @@ FrontendResult check(std::istream& source, const std::string& file, Stage stage,
 
   for (auto* token : tokens.getTokens()) {
     if (const auto* message = invalidToken(token->getType())) {
-      diagnostics.push_back({file, token->getLine(), token->getCharPositionInLine() + 1, "lex", message});
+      diagnostics.push_back({file, token->getLine(), token->getCharPositionInLine() + 1,
+        "lex", message});
     }
   }
   if (!diagnostics.empty() || stage == Stage::LEX) {
@@ -75,8 +77,11 @@ FrontendResult check(std::istream& source, const std::string& file, Stage stage,
   }
   // Error recovery of ANTLR can generate a CST even if the code is invalid,
   // so acceptance depends on diagnostics, not the CST.
-  if (diagnostics.empty() && stage == Stage::AST) {
+  if (diagnostics.empty() && (stage == Stage::AST || stage == Stage::SEMANTIC)) {
     result.tree = AstBuilder().build_root(tree);
+    if (stage == Stage::SEMANTIC) {
+      sema::analyze(*std::get<std::unique_ptr<ast::Crate>>(*result.tree), file, diagnostics);
+    }
   }
   return result;
 }
