@@ -193,7 +193,9 @@ ItemPtr AstBuilder::build_item(Context* context) {
   }
   if (auto* function = dynamic_cast<RxParser::FunctionDefinitionContext*>(context)) {
     FunctionItem value;
+    value.span = span;
     value.name = function->identifier()->getText();
+    value.has_generics = function->genericParams() != nullptr;
     if (auto* params = function->functionParameters()) {
       if (auto* self = params->selfParam()) {
         value.receiver = Receiver{sourceSpan(self), self->AMP() != nullptr, self->MUT() != nullptr};
@@ -212,6 +214,7 @@ ItemPtr AstBuilder::build_item(Context* context) {
   }
   if (auto* structure = dynamic_cast<RxParser::StructDefinitionContext*>(context)) {
     StructItem value;
+    value.span = span;
     value.name = structure->identifier()->getText();
     for (auto* attribute : structure->outerAttribute()) {
       for (auto* derive : attribute->deriveName()) {
@@ -225,11 +228,17 @@ ItemPtr AstBuilder::build_item(Context* context) {
     return makeNode<Item>(span, std::move(value));
   }
   if (auto* constant = dynamic_cast<RxParser::ConstantItemContext*>(context)) {
-    return makeNode<Item>(span, ConstItem{constant->identifier()->getText(),
-      build_type(constant->typeRef()), build_expr(constant->constValue())});
+    ConstItem value;
+    value.span = span;
+    value.name = constant->identifier()->getText();
+    value.type = build_type(constant->typeRef());
+    value.value = build_expr(constant->constValue());
+    return makeNode<Item>(span, std::move(value));
   }
   auto* impl = static_cast<RxParser::InherentImplContext*>(context);
-  ImplItem value{build_type(impl->typeRef()), {}};
+  ImplItem value;
+  value.span = span;
+  value.type = build_type(impl->typeRef());
   for (auto* item : impl->associatedItem()) {
     value.items.push_back(build_item(item));
   }
@@ -432,7 +441,9 @@ ExprPtr AstBuilder::build_primary(Context* context) {
       return result;
     }
     if (kind == RxParser::CONTINUE) {
-      return makeNode<Expr>(span, ContinueExpr{});
+      ContinueExpr jump;
+      jump.span = span;
+      return makeNode<Expr>(span, std::move(jump));
     }
     if (kind == RxParser::BREAK || kind == RxParser::RETURN) {
       ExprPtr value;
@@ -440,9 +451,15 @@ ExprPtr AstBuilder::build_primary(Context* context) {
         value = build_expr(rule(context->children.at(1)));
       }
       if (kind == RxParser::BREAK) {
-        return makeNode<Expr>(span, BreakExpr{std::move(value)});
+        BreakExpr jump;
+        jump.span = span;
+        jump.value = std::move(value);
+        return makeNode<Expr>(span, std::move(jump));
       }
-      return makeNode<Expr>(span, ReturnExpr{std::move(value)});
+      ReturnExpr jump;
+      jump.span = span;
+      jump.value = std::move(value);
+      return makeNode<Expr>(span, std::move(jump));
     }
     if (kind == RxParser::LOOP) {
       return makeNode<Expr>(span, LoopExpr{build_expr(rule(context->children.at(1)))});
@@ -583,6 +600,7 @@ ExprPtr AstBuilder::build_expr(Context* context) {
           RepeatExpr{build_expr(array->expression(0)), build_expr(array->constValue())});
       }
       ArrayExpr value;
+      value.span = sourceSpan(context);
       for (auto* element : array->expression()) {
         value.elements.push_back(build_expr(element));
       }

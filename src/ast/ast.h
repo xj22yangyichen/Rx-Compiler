@@ -155,6 +155,7 @@ struct StructExpr {
 
 
 struct ArrayExpr {
+  Span span;
   std::vector<ExprPtr> elements;
 };
 
@@ -190,14 +191,18 @@ struct WhileExpr {
 
 
 struct BreakExpr {
+  Span span;
   ExprPtr value;
 };
 
 
-struct ContinueExpr {};
+struct ContinueExpr {
+  Span span;
+};
 
 
 struct ReturnExpr {
+  Span span;
   ExprPtr value;
 };
 
@@ -250,7 +255,9 @@ struct Parameter {
 
 
 struct FunctionItem {
+  Span span;
   std::string name;
+  bool has_generics = false;
   std::optional<Receiver> receiver;
   std::vector<Parameter> parameters;
   TypePtr return_type;
@@ -266,6 +273,7 @@ struct StructField {
 
 
 struct StructItem {
+  Span span;
   std::string name;
   std::vector<std::string> derives;
   std::vector<StructField> fields;
@@ -273,6 +281,7 @@ struct StructItem {
 
 
 struct ConstItem {
+  Span span;
   std::string name;
   TypePtr type;
   ExprPtr value;
@@ -280,6 +289,7 @@ struct ConstItem {
 
 
 struct ImplItem {
+  Span span;
   TypePtr type;
   std::vector<ItemPtr> items;
 };
