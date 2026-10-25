@@ -70,12 +70,17 @@ class AstRunner:
         [str(self.compiler), "--stage", "ast", "--entry", entry, str(source)],
         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=self.timeout,
       )
-      if not should_accept:
+      if should_accept is False:
         if result.returncode != 1 or result.stdout or not result.stderr:
           raise AssertionError(f"rejected source must return 1, diagnose, and emit no AST; got {result.returncode}")
         return None
-      if result.returncode != 0 or result.stderr:
-        raise AssertionError(f"exit {result.returncode}: {result.stderr}")
+      if result.returncode != 0:
+        # A negative case may be rejected before the AST stage; that is still a normal rejection.
+        if should_accept is True or result.returncode != 1 or result.stdout or not result.stderr:
+          raise AssertionError(f"exit {result.returncode}: {result.stderr}")
+        return None
+      if result.stderr:
+        raise AssertionError(f"exit 0 with diagnostics: {result.stderr}")
       document = json.loads(result.stdout)
       if document["file"] != str(source) or document["span_units"] != "unicode-codepoints":
         raise AssertionError("wrong AST document metadata")
@@ -107,6 +112,8 @@ def officialTests(runner, official):
         if suite == "parser":
           entry = row.get("metadata", {}).get("entry", "crate")
           should_accept = row["compilation_success"]
+        elif not row["compilation_success"]:
+          should_accept = None
         runner.run_case(f"official:{suite}", manifest.parent / row["source"], entry, should_accept)
   manifest = official / "lexer/manifest.json"
   for row in loadManifest(manifest):

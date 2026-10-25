@@ -16,6 +16,8 @@ int main(int argc, char** argv) {
         stage = rx::Stage::LEX;
       } else if (value == "ast") {
         stage = rx::Stage::AST;
+      } else if (value == "semantic") {
+        stage = rx::Stage::SEMANTIC;
       }
     } else if (argument == "--entry") {
       const std::string value = argv[++i];

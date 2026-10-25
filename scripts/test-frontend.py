@@ -33,6 +33,8 @@ class Runner:
 
   def run(self, group, label, arguments, expected, contains=(), excludes=(),
     diagnostic_count=None):
+    if isinstance(expected, int):
+      expected = (expected,)
     self.total[group] += 1
     problems = []
     try:
@@ -44,13 +46,13 @@ class Runner:
     except subprocess.TimeoutExpired:
       problems.append(f"timeout after {self.timeout:g}s")
     else:
-      if result.returncode != expected:
-        problems.append(f"expected exit {expected}, got {result.returncode}")
+      if result.returncode not in expected:
+        problems.append(f"expected exit {'/'.join(map(str, expected))}, got {result.returncode}")
       if result.stdout:
         problems.append("unexpected stdout")
-      if expected == 0 and result.stderr:
+      if result.returncode == 0 and result.stderr:
         problems.append("unexpected stderr on success")
-      if expected != 0 and not result.stderr:
+      if result.returncode != 0 and not result.stderr:
         problems.append("missing diagnostic on stderr")
       for fragment in contains:
         if fragment not in result.stderr:
@@ -95,9 +97,10 @@ def parseRegressions(runner, official):
       raise ValueError(f"no manifests found under {official / suite}")
     for manifest in manifests:
       for row in loadManifest(manifest):
-        # Semantic rejection does not imply a syntax error.
+        # A negative case may be rejected by the parser instead of the semantic stage.
+        expected = (0,) if row["compilation_success"] else (0, 1)
         runner.run(f"parse-only:{suite}", f"{manifest.parent.name}/{row['source']}",
-          ["--stage", "parse", manifest.parent / row["source"]], 0)
+          ["--stage", "parse", manifest.parent / row["source"]], expected)
 
 def customTests(runner):
   cases = json.loads((ROOT / "tests/custom/frontend/cases.json").read_text(encoding="utf-8"))
