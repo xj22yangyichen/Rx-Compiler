@@ -44,3 +44,6 @@ jobs:
 
       - name: Run AST tests
         run: python3 scripts/test-ast.py
+
+      - name: Run semantic tests
+        run: make test STAGE=semantic BUILD=
