@@ -41,8 +41,8 @@ add_library(rx_frontend STATIC
   src/ast/ast.cpp src/ast/ast-printer.cpp
   src/frontend/error-listener.cpp src/frontend/frontend.cpp
   src/frontend/ast-builder.cpp
-  src/sema/analyzer.cpp src/sema/type.cpp
-  src/sema/check-stmt.cpp src/sema/check-expr.cpp)
+  src/semantic/analyzer.cpp src/semantic/type.cpp
+  src/semantic/check-stmt.cpp src/semantic/check-expr.cpp)
 target_link_libraries(rx_frontend PUBLIC rx_parser)
 target_compile_options(rx_frontend PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(rxc src/main.cpp)

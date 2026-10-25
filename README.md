@@ -19,7 +19,7 @@ make -C specification-zh serve
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
 | 前端 | 词法 / 语法分析，错误检测，AST 构建 | 完成 |
-| 语义分析 | 名字解析、类型检查、可变性检查 | 未开始 |
+| 语义分析 | 名字解析、类型检查、可变性检查、常量求值 | 完成 |
 | IR | 生成 LLVM IR 文本 | 未开始 |
 | 代码生成 | 自实现后端，输出 RV32IM 汇编 | 未开始 |
 | 优化 | 寄存器分配、内联、死代码消除、常量传播、尾递归、除法取模优化 | 未开始 |
@@ -39,8 +39,14 @@ src/
   ast/
     ast.h / .cpp           AST 节点定义
     ast-printer.h / .cpp   AST 的 JSON 输出（调试用）
+  semantic/
+    analyzer.h / .cpp      语义分析入口、声明收集、类型解析与常量求值
+    type.h / .cpp          语义类型表示与类型相等判定
+    check-stmt.cpp         函数体、块、语句与局部绑定检查
+    check-expr.cpp         表达式类型、可变性、调用与类型转换检查
 docs/
   ast.md                   AST 节点设计与 JSON 输出格式
+  semantic.md              语义分析的职责、设计与工作流程
 grammar/                   官方提供的 ANTLR 文法（Lexer.g4, Parser.g4），不做修改
 tests/
   official/                官方测试用例（testcases/ 的副本）
@@ -84,23 +90,31 @@ cmake --build target/frontend -j2
 ## 使用
 
 ```sh
-rxc [--stage lex|parse|ast] [--entry crate|expression|typeRef|item|letStatement] <source.rx>
+rxc [--stage lex|parse|ast|semantic] [--entry crate|expression|typeRef|item|letStatement] <source.rx>
 ```
 
 | 选项 | 说明 | 默认值 |
 | --- | --- | --- |
-| `--stage` | `lex` 只做词法检查；`parse` 做词法 + 语法检查；`ast` 在此基础上构建 AST 并输出 JSON | `parse` |
-| `--entry` | 语法分析的起始规则。`crate` 为完整程序，其余为语法片段，用于官方 parser 测试 | `crate` |
+| `--stage` | `lex` 做词法检查；`parse` 增加语法检查；`ast` 构建并输出 AST；`semantic` 在 AST 上进行语义检查 | `parse` |
+| `--entry` | 语法分析的起始规则。`crate` 为完整程序，其余为语法片段；`semantic` 阶段仅支持 `crate` | `crate` |
 
-退出码：**0** 表示接受，**1** 表示源码存在词法或语法错误。诊断信息输出到 stderr，格式为：
+退出码：**0** 表示接受，**1** 表示源码在所选阶段的检查中存在错误。诊断信息输出到 stderr，格式为：
 
 ```text
 bad.rx:3:1: parse error: missing ';' at '}'
 ```
 
-词法错误和语法错误会分别标记为 `lex error` / `parse error`。词法阶段出错时不再进入语法分析。即便 ANTLR 的错误恢复机制返回了一棵解析树，只要产生过诊断就判定为拒绝。
+词法、语法、语义错误分别标记为 `lex error` / `parse error` / `semantic error`。词法阶段出错时不再进入语法分析，词法和语法检查均通过后才构建 AST 并进入语义分析。即便 ANTLR 的错误恢复机制返回了一棵解析树，只要产生过诊断就判定为拒绝。
 
 `--stage ast` 成功时把 AST 以 JSON 形式写到 stdout，节点结构和输出格式见 [docs/ast.md](docs/ast.md)。
+
+语义检查完整程序：
+
+```sh
+./target/frontend/rxc --stage semantic program.rx
+```
+
+当前 `semantic` 阶段只要构建出 AST，也会向 stdout 输出 AST JSON，包括随后发现语义错误的情况；程序是否被接受应以退出码为准。语义分析的设计与流程见 [docs/semantic.md](docs/semantic.md)。
 
 命令行参数不做校验，只支持上述合法形式。注意源文件不存在时不会报错，而是按空输入处理。
 
@@ -117,7 +131,7 @@ python3 scripts/test-frontend.py --parse-regressions
 | `official:lex` | 官方 lexer 测试，按 `compilation_success` 检查退出码 | 53 |
 | `official:parse` | 官方 parser 测试，按清单中的 `entry` 选择起始规则 | 442 |
 | `custom:diagnostics` | 自定义用例，检查诊断的位置、内容和条数 | 26 |
-| `parse-only:*` | 对 semantic / codegen / optimization 的全部源文件做纯语法检查 | 309 |
+| `parse-only:*` | 对 semantic / codegen / optimization 的全部源文件做纯语法检查；负例允许在语法阶段被拒绝 | 312 |
 
 不加 `--parse-regressions` 时跳过最后一组。
 
@@ -129,7 +143,7 @@ python3 scripts/test-ast.py
 
 | 分组 | 内容 | 用例数 |
 | --- | --- | --- |
-| `official:*` | 对所有官方源文件构建 AST，检查 JSON 合法、span 嵌套正确、行列号与源码一致 | 751 |
+| `official:*` | 按用例预期检查 AST 输出；构建成功时检查 JSON、span 和行列号；运行阶段负例允许在语法阶段被拒绝 | 754 |
 | `official:lex-errors` | 词法错误的源文件不得输出 AST | 23 |
 | `custom:structure` | 结构断言：优先级、结合性、块尾表达式、双重引用、类型参数等 | 27 |
 | `custom:operators` | 全部一元、二元、赋值运算符 | 34 |
@@ -143,6 +157,14 @@ python3 scripts/test-ast.py
 
 ### 官方测试框架
 
-`make test` 调用 [config.mk](config.mk) 中配置的命令运行 semantic / ir / codegen / optimization 测试。目前 `config.mk` 仍是官方模板给出的 rustc 参考配置，待语义分析阶段完成后再接入 `rxc`。用法详见 [README-ZH.md](README-ZH.md)。
+运行当前已实现的语义分析测试：
+
+```sh
+make test STAGE=semantic
+```
+
+当前官方 semantic 测试共 239 个用例，全部通过。框架通过退出码检查接受或拒绝结果。
+
+`make test` 调用 [config.mk](config.mk) 中配置的命令运行 semantic / ir / codegen / optimization 测试。`BUILD` 和 `SEMANTIC` 已接入本项目的 C++ 编译器 `rxc`；`IR` 和 `CODEGEN` 仍使用 rustc 参考配置，`RUN` 使用 REIMU，这些配置不代表自实现的后续阶段已经完成。框架用法详见 [README-ZH.md](README-ZH.md)。
 
 官方框架会跳过 lex 和 parse 类型的测试，这两类由上面的前端测试脚本覆盖。
