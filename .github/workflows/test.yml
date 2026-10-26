@@ -17,11 +17,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y g++-14
 
-      - name: Install ANTLR 4.13.2
+      - name: Install ANTLR C++ runtime 4.13.2
         run: |
           mkdir -p "$HOME/.local/lib" "$HOME/.local/src"
-          curl -fsSL -o "$HOME/.local/lib/antlr-4.13.2-complete.jar" \
-            https://www.antlr.org/download/antlr-4.13.2-complete.jar
           curl -fsSL -o /tmp/antlr4-cpp-runtime.zip \
             https://www.antlr.org/download/antlr4-cpp-runtime-4.13.2-source.zip
           unzip -q /tmp/antlr4-cpp-runtime.zip -d "$HOME/.local/src/antlr4-cpp"
@@ -36,7 +34,8 @@ jobs:
 
       - name: Build rxc
         run: |
-          cmake -S . -B target/frontend -DCMAKE_CXX_COMPILER=g++-14
+          cmake -S . -B target/frontend -DCMAKE_CXX_COMPILER=g++-14 \
+            -DRX_REGENERATE_PARSER=OFF
           cmake --build target/frontend -j"$(nproc)"
 
       - name: Run frontend tests

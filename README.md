@@ -31,6 +31,7 @@ make -C specification-zh serve
 ```text
 src/
   main.cpp                 命令行入口
+  generated/               预生成的 ANTLR C++ 解析器源码
   frontend/
     frontend.h / .cpp      词法 → 语法 → AST 的流水线入口
     error-listener.h / .cpp ANTLR 错误监听器
@@ -68,15 +69,13 @@ crates/rx                  官方提供的 rustc 参考实现辅助代码
 | --- | --- | --- |
 | g++-14 | 编译本项目 | 需要 C++17 |
 | CMake ≥ 3.20 | 构建 | |
-| Java | 运行 ANTLR 生成工具 | 构建时自动调用 |
-| ANTLR 4.13.2 | 生成词法 / 语法分析器 | jar 包与 C++ 运行时库 |
+| ANTLR C++ runtime | 编译和运行词法 / 语法分析器 | CI 使用 4.13.2 |
+| Java + ANTLR 4.13.2 jar | 重新生成词法 / 语法分析器 | 仅更新文法时需要 |
 | Python 3 | 测试脚本 | |
 | xmake + REIMU | 运行生成的汇编 | 后续阶段 |
 | Clang 22 | IR 阶段测试 | 后续阶段 |
 
-ANTLR 的安装位置：jar 包默认在 `~/.local/lib/antlr-4.13.2-complete.jar`，可通过 CMake 变量 `ANTLR_JAR` 覆盖；C++ 运行时的头文件在 `~/.local/include/antlr4-runtime`，库文件在 `~/.local/lib`。
-
-构建时 CMake 会把 `grammar/` 下的文法复制一份并改名为 `RxLexer` / `RxParser`（避免与 ANTLR 运行时自身的 `antlr4::Lexer` / `antlr4::Parser` 类名冲突），再调用 ANTLR 生成 C++ 代码到构建目录。原始文法文件不会被修改。
+普通构建直接使用 `src/generated/` 中随仓库提供的解析器源码，不需要 Java、ANTLR jar 或联网下载。CMake 会查找系统安装的 ANTLR C++ runtime，也支持 `~/.local/include/antlr4-runtime` 和 `~/.local/lib`；可用 `ANTLR_INCLUDE_DIR`、`ANTLR_LIBRARY` 指定其他位置。
 
 ## 构建
 
@@ -86,6 +85,25 @@ cmake --build target/frontend -j2
 ```
 
 生成的可执行文件为 `target/frontend/rxc`。
+
+### 更新解析器
+
+文法更新后，在有 Java 的开发环境中重新生成解析器：
+
+```sh
+cmake -S . -B target/parser-generator -DCMAKE_CXX_COMPILER=g++-14 \
+  -DRX_REGENERATE_PARSER=ON \
+  -DANTLR_JAR="$HOME/.local/lib/antlr-4.13.2-complete.jar"
+cmake --build target/parser-generator --target rx_parser -j2
+cp target/parser-generator/generated/RxLexer.cpp src/generated/rx-lexer.cpp
+cp target/parser-generator/generated/RxLexer.h src/generated/rx-lexer.h
+cp target/parser-generator/generated/RxParser.cpp src/generated/rx-parser.cpp
+cp target/parser-generator/generated/RxParser.h src/generated/rx-parser.h
+```
+
+生成时将文法副本改名为 `RxLexer` / `RxParser`，避免与 ANTLR 运行时类名冲突，原始文法不变。预生成文件保留生成器输出的内容；普通构建会将它们复制为构建目录中的 `RxLexer.*`、`RxParser.*`，供现有代码引用。更新后应将四个生成文件与文法改动一同提交。
+
+OJ 的 C++ 环境没有 Java 时使用默认构建即可，提交时必须包含 `src/generated/` 中的四个文件，并确保评测环境提供兼容的 ANTLR C++ runtime。
 
 ## 使用
 
