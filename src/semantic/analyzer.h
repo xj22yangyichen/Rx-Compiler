@@ -1,67 +1,38 @@
 #pragma once
 
-#include "type.h"
+#include "result.h"
 #include "../ast/ast.h"
 #include "../frontend/diagnostic.h"
 #include <map>
 #include <deque>
 #include <vector>
 #include <string>
-#include <cstdint>
 #include <optional>
 
 namespace rx::semantic {
-struct FunctionInfo {
-  const ast::FunctionItem* declaration = nullptr;
-};
-
-
-struct StructInfo {
-  ast::Span span;
-  const ast::StructItem* declaration = nullptr;
-  std::vector<const Type*> field_types;
-  std::map<std::string, FunctionInfo> functions;
-  std::map<std::string, const ast::ConstItem*> constants;
-  bool has_copy = false;
-  bool has_clone = false;
-  bool has_partial_eq = false;
-  bool has_eq = false;
-};
-
-
-struct LocalVar {
-  const Type* type = nullptr;
-  bool is_mutable = false;
-};
-
-
-struct ConstValue {
-  const Type* type = nullptr;
-  std::int64_t value = 0;
-};
-
-
-struct Place {
-  const Type* type = nullptr;
-  bool is_mutable = false;
-  bool is_borrowed_shared = false;
-};
-
-
+// 保存当前正在分析的循环的信息
 struct LoopContext {
   bool accepts_value = false;
   const Type* expected = nullptr;
   std::vector<const Type*> break_types;
   bool has_break = false;
+  LoopTarget target = {};
+  std::vector<const ast::Expr*> break_values;
 };
 
 
 class Analyzer {
 public:
   // 整个语义检查部分的入口
-  void run(const ast::Crate& crate, const std::string& file, std::vector<Diagnostic>& diagnostics);
+  std::unique_ptr<AnalysisResult> run(const ast::Crate& crate,
+    const std::string& file, std::vector<Diagnostic>& diagnostics);
 
 private:
+  // 当前语义分析的结果，分析完成后交给调用者
+  std::unique_ptr<AnalysisResult> result_;
+  // 指向当前正在分析的函数声明，用于检查 return 语句返回到哪里
+  const ast::FunctionItem* current_function_ = nullptr;
+
   // 保存文件名用于报错
   std::string file_;
   // 保存语义检查阶段的报错信息列表
@@ -88,6 +59,17 @@ private:
   const StructInfo* self_struct_ = nullptr;
   // 指向当前函数的返回类型，用于检查 return 语句的类型是否正确
   const Type* return_type_ = nullptr;
+
+  // 记录表达式的类型信息
+  void record_expression(const ast::Expr& expression, const Type* type);
+  // 记录类型转换的具体步骤
+  void record_coercion(const ast::Expr& expression, const Type* to);
+  // 清空表达式的调整记录，记录指定次数的解引用操作及每步的结果的类型
+  void record_derefs(const ast::Expr& expression, std::size_t count);
+  // 保存选中的方法，以及接收者的解引用和借用步骤
+  // @param variant 0 表示不新增借用，1 表示共享借用，2 表示可变借用
+  void record_method(const ast::MethodCallExpr& call, CallInfo info,
+    std::size_t derefs, int variant, const Type* candidate);
 
   // 把语义检查阶段的报错记录到之前准备好的 diagnostics_ 中
   void error(const ast::Span& span, const std::string& message);
@@ -185,7 +167,7 @@ private:
   //确定名字或路径表达式的类型
   const Type* checkPathExpr(const ast::PathExpr& path);
   // 检查一元表达式
-  const Type* checkUnary(const ast::UnaryExpr& unary);
+  const Type* checkUnary(const ast::Expr& expression, const ast::UnaryExpr& unary);
   // 检查二元表达式
   const Type* checkBinary(const ast::BinaryExpr& binary);
   // 检查普通赋值和复合赋值表达式
@@ -197,9 +179,9 @@ private:
   // 检查点号调用形式的方法调用
   const Type* checkMethodCall(const ast::MethodCallExpr& call);
   // 检查字段访问表达式并返回字段的类型
-  const Type* checkField(const ast::FieldExpr& field);
+  const Type* checkField(const ast::Expr& expression);
   // 检查索引访问表达式并返回元素的类型
-  const Type* checkIndex(const ast::IndexExpr& index);
+  const Type* checkIndex(const ast::Expr& expression);
   // 检查结构体构造表达式
   const Type* checkStructExpr(const ast::StructExpr& literal);
   // 检查列表式数组 [a, b, c]
@@ -256,5 +238,6 @@ private:
 };
 
 // 语义分析的入口，创建一个 Analyzer 对象并调用 run 方法
-void analyze(const ast::Crate& crate, const std::string& file, std::vector<Diagnostic>& diagnostics);
+std::unique_ptr<AnalysisResult> analyze(const ast::Crate& crate,
+  const std::string& file, std::vector<Diagnostic>& diagnostics);
 }

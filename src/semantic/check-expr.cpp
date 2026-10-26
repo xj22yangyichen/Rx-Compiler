@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <variant>
+#include <utility>
 
 namespace rx::semantic {
 namespace {
@@ -161,6 +162,7 @@ const Type* Analyzer::adjustTo(const Type* from, const Type* to) {
 
 bool Analyzer::coerce(const ast::Expr& expression, const Type* from, const Type* to) {
   if (adjustTo(from, to) != nullptr) {
+    record_coercion(expression, to);
     return true;
   }
   error(expression.span, "type mismatch");
@@ -221,18 +223,20 @@ const Type* Analyzer::checkIntegerLiteral(const ast::IntegerExpr& literal, const
 const Type* Analyzer::checkPathExpr(const ast::PathExpr& path) {
   if (path.path.size() == 1) {
     if (LocalVar* local = lookupLocal(path.path.front().name)) {
+      result_->bindings[&path] = local->binding;
       return local->type;
     }
   }
   const ast::ConstItem* item = resolveConstantPath(path.path);
   if (item != nullptr) {
+    result_->bindings[&path] = item;
     return resolveType(*item->type);
   }
   error(path.path.front().span, "unresolved name");
   return nullptr;
 }
 
-const Type* Analyzer::checkUnary(const ast::UnaryExpr& unary) {
+const Type* Analyzer::checkUnary(const ast::Expr& expression, const ast::UnaryExpr& unary) {
   if (unary.op == ast::Op::BORROW || unary.op == ast::Op::BORROW_MUT) {
     const bool is_mutable = unary.op == ast::Op::BORROW_MUT;
     auto place = checkPlace(*unary.operand);
@@ -246,7 +250,7 @@ const Type* Analyzer::checkUnary(const ast::UnaryExpr& unary) {
     return referenceType(place->type, is_mutable);
   }
   if (unary.op == ast::Op::DEREFERENCE) {
-    auto place = placeOfUnary(unary);
+    auto place = checkPlace(expression);
     return place.has_value() ? place->type : nullptr;
   }
   const Type* type = checkExpr(*unary.operand, nullptr);
@@ -262,6 +266,7 @@ const Type* Analyzer::checkUnary(const ast::UnaryExpr& unary) {
       error(unary.operand->span, "only one shared reference layer is supported");
       return nullptr;
     }
+    record_derefs(*unary.operand, 1);
     type = type->target;
   }
   if (unary.op == ast::Op::NEGATE) {
@@ -305,6 +310,7 @@ const Type* Analyzer::checkBinary(const ast::BinaryExpr& binary) {
   if (isComparison(binary.op)) {
     const Type* l = left;
     const Type* r = right;
+    std::size_t derefs = 0;
     while (l->kind == TypeKind::REF && r->kind == TypeKind::REF) {
       if (l->is_mutable && !r->is_mutable) {
         error(binary.left->span, "cannot compare a mutable reference with a shared one");
@@ -312,7 +318,10 @@ const Type* Analyzer::checkBinary(const ast::BinaryExpr& binary) {
       }
       l = l->target;
       r = r->target;
+      ++derefs;
     }
+    record_derefs(*binary.left, derefs);
+    record_derefs(*binary.right, derefs);
     if (l->kind == TypeKind::REF || r->kind == TypeKind::REF) {
       error(binary.left->span, "cannot compare a value with a reference");
       return make(TypeKind::BOOL);
@@ -334,6 +343,7 @@ const Type* Analyzer::checkBinary(const ast::BinaryExpr& binary) {
       error(expression.span, "only one shared reference layer is supported");
       return nullptr;
     }
+    record_derefs(expression, 1);
     return type->target;
   };
   const Type* l = scalar(left, *binary.left);
@@ -378,6 +388,7 @@ const Type* Analyzer::checkAssign(const ast::AssignExpr& assign) {
     if (right != nullptr) {
       const Type* value = right;
       if (value->kind == TypeKind::REF && !value->is_mutable && value->target->kind != TypeKind::REF) {
+        record_derefs(*assign.right, 1);
         value = value->target;
       }
       if (!isInteger(value->kind)) {
@@ -389,6 +400,7 @@ const Type* Analyzer::checkAssign(const ast::AssignExpr& assign) {
     if (right != nullptr) {
       const Type* value = right;
       if (value->kind == TypeKind::REF && !value->is_mutable && value->target->kind != TypeKind::REF) {
+        record_derefs(*assign.right, 1);
         value = value->target;
       }
       coerce(*assign.right, value, place->type);
@@ -431,12 +443,17 @@ const Type* Analyzer::checkCall(const ast::CallExpr& call) {
       return nullptr;
     }
     if (segment.name == "get_i32") {
+      result_->calls[&call].builtin = Builtin::GET_I32;
       if (!call.arguments.empty()) {
         error(segment.span, "get_i32 takes no arguments");
       }
       return make(TypeKind::I32);
     }
     if (segment.name == "print_i32" || segment.name == "println_i32") {
+      result_->calls[&call].builtin = Builtin::PRINT_I32;
+      if (segment.name == "println_i32") {
+        result_->calls[&call].builtin = Builtin::PRINTLN_I32;
+      }
       if (call.arguments.size() != 1) {
         error(segment.span, "this builtin takes exactly one argument");
         return make(TypeKind::UNIT);
@@ -474,7 +491,12 @@ const Type* Analyzer::checkCall(const ast::CallExpr& call) {
     }
     const TypeKind kind = owner.name == "Box" ? TypeKind::BOX : TypeKind::VEC;
     const Type* container = containerType(kind, element);
+    result_->calls[&call].owner = container;
     if (member.name == "new") {
+      result_->calls[&call].builtin = Builtin::VEC_NEW;
+      if (kind == TypeKind::BOX) {
+        result_->calls[&call].builtin = Builtin::BOX_NEW;
+      }
       if (kind == TypeKind::BOX) {
         if (call.arguments.size() != 1) {
           error(member.span, "Box::new takes exactly one argument");
@@ -490,6 +512,7 @@ const Type* Analyzer::checkCall(const ast::CallExpr& call) {
       return container;
     }
     if (member.name == "clone") {
+      result_->calls[&call].builtin = Builtin::CLONE;
       if (call.arguments.size() != 1) {
         error(member.span, "clone takes exactly one argument");
         return container;
@@ -504,6 +527,10 @@ const Type* Analyzer::checkCall(const ast::CallExpr& call) {
       return container;
     }
     if (member.name == "len" || member.name == "is_empty") {
+      result_->calls[&call].builtin = Builtin::LEN;
+      if (member.name == "is_empty") {
+        result_->calls[&call].builtin = Builtin::IS_EMPTY;
+      }
       if (kind != TypeKind::VEC) {
         error(member.span, "unknown associated function");
         return nullptr;
@@ -520,6 +547,10 @@ const Type* Analyzer::checkCall(const ast::CallExpr& call) {
       return make(member.name == "len" ? TypeKind::USIZE : TypeKind::BOOL);
     }
     if (member.name == "push" || member.name == "remove") {
+      result_->calls[&call].builtin = Builtin::PUSH;
+      if (member.name == "remove") {
+        result_->calls[&call].builtin = Builtin::REMOVE;
+      }
       if (kind != TypeKind::VEC) {
         error(member.span, "unknown associated function");
         return nullptr;
@@ -551,6 +582,8 @@ const Type* Analyzer::checkCall(const ast::CallExpr& call) {
   auto found = info->functions.find(member.name);
   if (found == info->functions.end()) {
     if (member.name == "clone" && info->has_clone) {
+      result_->calls[&call].builtin = Builtin::CLONE;
+      result_->calls[&call].owner = structType(*info);
       const Type* expected = referenceType(structType(*info), false);
       if (call.arguments.size() != 1) {
         error(member.span, "clone takes exactly one argument");
@@ -570,6 +603,8 @@ const Type* Analyzer::checkCall(const ast::CallExpr& call) {
 
 const Type* Analyzer::checkOrdinaryCall(const ast::CallExpr& call,
   const ast::FunctionItem& function, const Type* receiver_type) {
+  result_->calls[&call].function = &function;
+  result_->calls[&call].owner = receiver_type;
   const StructInfo* saved = self_struct_;
   if (receiver_type != nullptr && receiver_type->kind == TypeKind::STRUCT) {
     const StructInfo* owner = structInfo(receiver_type->declaration);
@@ -726,6 +761,10 @@ const Type* Analyzer::checkMethodCall(const ast::MethodCallExpr& call) {
           result = resolveType(*method.return_type);
         }
         self_struct_ = saved;
+        CallInfo info;
+        info.function = &method;
+        info.owner = shape;
+        record_method(call, std::move(info), derefs, variant, candidate);
         return result;
       }
       if (is_mutable_candidate) {
@@ -745,6 +784,20 @@ const Type* Analyzer::checkMethodCall(const ast::MethodCallExpr& call) {
           }
         }
       }
+      CallInfo info;
+      info.owner = shape;
+      if (name == "clone") {
+        info.builtin = Builtin::CLONE;
+      } else if (name == "len") {
+        info.builtin = Builtin::LEN;
+      } else if (name == "is_empty") {
+        info.builtin = Builtin::IS_EMPTY;
+      } else if (name == "push") {
+        info.builtin = Builtin::PUSH;
+      } else if (name == "remove") {
+        info.builtin = Builtin::REMOVE;
+      }
+      record_method(call, std::move(info), derefs, variant, candidate);
       return result;
     }
     const Type* next = derefOnce(current);
@@ -757,13 +810,13 @@ const Type* Analyzer::checkMethodCall(const ast::MethodCallExpr& call) {
   return nullptr;
 }
 
-const Type* Analyzer::checkField(const ast::FieldExpr& field) {
-  auto place = placeOfField(field);
+const Type* Analyzer::checkField(const ast::Expr& expression) {
+  auto place = checkPlace(expression);
   return place.has_value() ? place->type : nullptr;
 }
 
-const Type* Analyzer::checkIndex(const ast::IndexExpr& index) {
-  auto place = placeOfIndex(index);
+const Type* Analyzer::checkIndex(const ast::Expr& expression) {
+  auto place = checkPlace(expression);
   return place.has_value() ? place->type : nullptr;
 }
 
@@ -794,6 +847,7 @@ const Type* Analyzer::checkStructExpr(const ast::StructExpr& literal) {
       checkExpr(*field.value, nullptr);
       continue;
     }
+    result_->initializers[&field] = {info->declaration, index};
     const Type* expected = info->field_types[index];
     const Type* value = checkExpr(*field.value, expected);
     if (value != nullptr && expected != nullptr) {
@@ -824,7 +878,11 @@ const Type* Analyzer::checkArray(const ast::ArrayExpr& array, const Type* expect
   if (element != nullptr) {
     return expected;
   }
-  return arrayType(lubOf(types), array.elements.size());
+  const Type* common = lubOf(types);
+  for (const auto& item : array.elements) {
+    record_coercion(*item, common);
+  }
+  return arrayType(common, array.elements.size());
 }
 
 const Type* Analyzer::checkRepeat(const ast::RepeatExpr& repeat, const Type* expected) {
@@ -865,15 +923,19 @@ const Type* Analyzer::checkIf(const ast::IfExpr& branch, const Type* expected) {
     }
     return expected;
   }
-  return lubOf({then_type, else_type});
+  const Type* common = lubOf({then_type, else_type});
+  record_coercion(*branch.then_branch, common);
+  record_coercion(*branch.else_branch, common);
+  return common;
 }
 
 const Type* Analyzer::checkLoop(const ast::LoopExpr& loop, const Type* expected) {
-  loops_.push_back(LoopContext{true, expected, {}, false});
+  loops_.push_back(LoopContext{true, expected, {}, false, &loop, {}});
   const ast::BlockExpr* body = asBlock(*loop.body);
   if (body != nullptr) {
     const Type* unit = make(TypeKind::UNIT);
     const Type* type = checkBlock(*body, unit);
+    record_expression(*loop.body, type);
     if (type != nullptr && adjustTo(type, unit) == nullptr) {
       error(loop.body->span, "a loop body must have unit type");
     }
@@ -886,18 +948,23 @@ const Type* Analyzer::checkLoop(const ast::LoopExpr& loop, const Type* expected)
   if (!context.has_break) {
     return make(TypeKind::NEVER);
   }
-  return lubOf(context.break_types);
+  const Type* common = lubOf(context.break_types);
+  for (const ast::Expr* value : context.break_values) {
+    record_coercion(*value, common);
+  }
+  return common;
 }
 
 const Type* Analyzer::checkWhile(const ast::WhileExpr& loop) {
   condition_barriers_.push_back(loops_.size());
   expectBool(*loop.condition, "a while condition");
   condition_barriers_.pop_back();
-  loops_.push_back(LoopContext{false, nullptr, {}, false});
+  loops_.push_back(LoopContext{false, nullptr, {}, false, &loop, {}});
   const ast::BlockExpr* body = asBlock(*loop.body);
   if (body != nullptr) {
     const Type* unit = make(TypeKind::UNIT);
     const Type* type = checkBlock(*body, unit);
+    record_expression(*loop.body, type);
     if (type != nullptr && adjustTo(type, unit) == nullptr) {
       error(loop.body->span, "a while body must have unit type");
     }
@@ -917,20 +984,23 @@ const Type* Analyzer::checkBreak(const ast::BreakExpr& jump) {
   if (!condition_barriers_.empty() && loops_.size() <= condition_barriers_.back()) {
     error(jump.span, "this break targets a loop outside the condition");
   }
-  LoopContext& context = loops_.back();
+  result_->breaks[&jump] = loops_.back().target;
+  const std::size_t loop_index = loops_.size() - 1;
+  const Type* expected = loops_.back().expected;
   if (jump.value != nullptr) {
-    if (!context.accepts_value) {
+    if (!loops_[loop_index].accepts_value) {
       error(jump.span, "a while cannot accept a break value");
     }
-    const Type* type = checkExpr(*jump.value, context.expected);
-    if (type != nullptr && context.expected != nullptr) {
-      coerce(*jump.value, type, context.expected);
+    const Type* type = checkExpr(*jump.value, expected);
+    if (type != nullptr && expected != nullptr) {
+      coerce(*jump.value, type, expected);
     }
-    context.has_break = true;
-    context.break_types.push_back(type);
+    loops_[loop_index].has_break = true;
+    loops_[loop_index].break_types.push_back(type);
+    loops_[loop_index].break_values.push_back(jump.value.get());
   } else {
-    context.has_break = true;
-    context.break_types.push_back(make(TypeKind::UNIT));
+    loops_[loop_index].has_break = true;
+    loops_[loop_index].break_types.push_back(make(TypeKind::UNIT));
   }
   return make(TypeKind::NEVER);
 }
@@ -940,6 +1010,7 @@ const Type* Analyzer::checkContinue(const ast::ContinueExpr& jump) {
     error(jump.span, "continue outside of a loop");
     return make(TypeKind::NEVER);
   }
+  result_->continues[&jump] = loops_.back().target;
   if (!condition_barriers_.empty() && loops_.size() <= condition_barriers_.back()) {
     error(jump.span, "this continue targets a loop outside the condition");
   }
@@ -947,6 +1018,7 @@ const Type* Analyzer::checkContinue(const ast::ContinueExpr& jump) {
 }
 
 const Type* Analyzer::checkReturn(const ast::ReturnExpr& jump) {
+  result_->returns[&jump] = current_function_;
   if (jump.value != nullptr) {
     const Type* type = checkExpr(*jump.value, return_type_);
     if (type != nullptr && return_type_ != nullptr) {
@@ -966,6 +1038,7 @@ std::optional<Place> Analyzer::placeOfPath(const ast::PathExpr& path) {
   if (local == nullptr) {
     return std::nullopt;
   }
+  result_->bindings[&path] = local->binding;
   return Place{local->type, local->is_mutable, false};
 }
 
@@ -1029,9 +1102,23 @@ std::optional<Place> Analyzer::placeOfField(const ast::FieldExpr& field) {
     }
     type = type->target;
   }
+  std::size_t derefs = 0;
+  const Type* original = result_->expressions[field.object.get()].type;
+  while (original != nullptr && original != type) {
+    original = derefOnce(original);
+    ++derefs;
+  }
+  record_derefs(*field.object, derefs);
   const Type* member = fieldOf(type, field.name, field.object->span);
   if (member == nullptr) {
     return std::nullopt;
+  }
+  const auto& fields = type->declaration->fields;
+  for (std::size_t index = 0; index < fields.size(); ++index) {
+    if (fields[index].name == field.name) {
+      result_->fields[&field] = {type->declaration, index};
+      break;
+    }
   }
   return narrowPlace(Place{member, is_mutable, shared});
 }
@@ -1062,6 +1149,13 @@ std::optional<Place> Analyzer::placeOfIndex(const ast::IndexExpr& index) {
     }
     type = type->target;
   }
+  std::size_t derefs = 0;
+  const Type* original = result_->expressions[index.object.get()].type;
+  while (original != nullptr && original != type) {
+    original = derefOnce(original);
+    ++derefs;
+  }
+  record_derefs(*index.object, derefs);
   if (type->kind != TypeKind::ARRAY && type->kind != TypeKind::VEC) {
     error(index.object->span, "this type cannot be indexed");
     checkExpr(*index.index, nullptr);
@@ -1079,7 +1173,7 @@ std::optional<Place> Analyzer::placeOfIndex(const ast::IndexExpr& index) {
 }
 
 std::optional<Place> Analyzer::checkPlace(const ast::Expr& expression) {
-  return std::visit([&](const auto& value) -> std::optional<Place> {
+  auto place = std::visit([&](const auto& value) -> std::optional<Place> {
     using Node = std::decay_t<decltype(value)>;
     if constexpr (std::is_same_v<Node, ast::PathExpr>) {
       return placeOfPath(value);
@@ -1093,10 +1187,16 @@ std::optional<Place> Analyzer::checkPlace(const ast::Expr& expression) {
       return std::nullopt;
     }
   }, expression.value);
+  if (place.has_value()) {
+    auto& info = result_->expressions[&expression];
+    info.type = place->type;
+    info.place = place;
+  }
+  return place;
 }
 
 const Type* Analyzer::checkExpr(const ast::Expr& expression, const Type* expected) {
-  return std::visit([&](const auto& value) -> const Type* {
+  const Type* type = std::visit([&](const auto& value) -> const Type* {
     using Node = std::decay_t<decltype(value)>;
     if constexpr (std::is_same_v<Node, ast::IntegerExpr>) {
       return checkIntegerLiteral(value, expected);
@@ -1105,9 +1205,16 @@ const Type* Analyzer::checkExpr(const ast::Expr& expression, const Type* expecte
     } else if constexpr (std::is_same_v<Node, ast::UnitExpr>) {
       return make(TypeKind::UNIT);
     } else if constexpr (std::is_same_v<Node, ast::PathExpr>) {
-      return checkPathExpr(value);
+      const Type* type = checkPathExpr(value);
+      if (value.path.size() == 1) {
+        if (LocalVar* local = lookupLocal(value.path.front().name)) {
+          result_->expressions[&expression].place =
+            Place{type, local->is_mutable, false};
+        }
+      }
+      return type;
     } else if constexpr (std::is_same_v<Node, ast::UnaryExpr>) {
-      return checkUnary(value);
+      return checkUnary(expression, value);
     } else if constexpr (std::is_same_v<Node, ast::BinaryExpr>) {
       return checkBinary(value);
     } else if constexpr (std::is_same_v<Node, ast::AssignExpr>) {
@@ -1119,9 +1226,9 @@ const Type* Analyzer::checkExpr(const ast::Expr& expression, const Type* expecte
     } else if constexpr (std::is_same_v<Node, ast::MethodCallExpr>) {
       return checkMethodCall(value);
     } else if constexpr (std::is_same_v<Node, ast::FieldExpr>) {
-      return checkField(value);
+      return checkField(expression);
     } else if constexpr (std::is_same_v<Node, ast::IndexExpr>) {
-      return checkIndex(value);
+      return checkIndex(expression);
     } else if constexpr (std::is_same_v<Node, ast::StructExpr>) {
       return checkStructExpr(value);
     } else if constexpr (std::is_same_v<Node, ast::ArrayExpr>) {
@@ -1144,5 +1251,7 @@ const Type* Analyzer::checkExpr(const ast::Expr& expression, const Type* expecte
       return checkReturn(value);
     }
   }, expression.value);
+  record_expression(expression, type);
+  return type;
 }
 }

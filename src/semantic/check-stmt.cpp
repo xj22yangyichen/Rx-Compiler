@@ -13,6 +13,9 @@ void Analyzer::checkFunction(const ast::FunctionItem& item) {
     error(item.span, "a receiver is only allowed inside an impl");
     return;
   }
+  current_function_ = &item;
+  auto& signature = result_->functions[&item];
+  signature.parameters.clear();
   const Type* saved_return = return_type_;
   return_type_ = make(TypeKind::UNIT);
   if (item.return_type != nullptr) {
@@ -23,15 +26,21 @@ void Analyzer::checkFunction(const ast::FunctionItem& item) {
     const Type* owner = structType(*self_struct_);
     const bool is_reference = item.receiver->is_reference;
     const Type* type = is_reference ? referenceType(owner, item.receiver->is_mutable) : owner;
-    scopes_.back().emplace("self", LocalVar{type, !is_reference && item.receiver->is_mutable});
+    signature.receiver = type;
+    scopes_.back().emplace("self", LocalVar{type, !is_reference && item.receiver->is_mutable, &*item.receiver});
   }
   for (const auto& parameter : item.parameters) {
-    scopes_.back().emplace(parameter.name, LocalVar{resolveType(*parameter.type), parameter.is_mutable});
+    const Type* type = resolveType(*parameter.type);
+    signature.parameters.push_back(type);
+    scopes_.back().emplace(parameter.name, LocalVar{type, parameter.is_mutable, &parameter});
   }
+  signature.result = return_type_;
   if (item.body != nullptr) {
     const ast::BlockExpr* body = asBlock(*item.body);
     if (body != nullptr) {
       const Type* type = checkBlock(*body, return_type_);
+      record_expression(*item.body, type);
+      record_coercion(*item.body, return_type_);
       if (type != nullptr && adjustTo(type, return_type_) == nullptr) {
         error(item.body->span, "the body does not match the declared return type");
       }
@@ -39,6 +48,7 @@ void Analyzer::checkFunction(const ast::FunctionItem& item) {
   }
   popScope();
   return_type_ = saved_return;
+  current_function_ = nullptr;
 }
 
 const Type* Analyzer::checkValue(const ast::Expr& expression, const Type* expected, bool* diverges) {
@@ -49,6 +59,7 @@ const Type* Analyzer::checkValue(const ast::Expr& expression, const Type* expect
   } else {
     type = checkExpr(expression, expected);
   }
+  record_expression(expression, type);
   if (type != nullptr && type->kind == TypeKind::NEVER) {
     child_diverges = true;
   }
@@ -85,6 +96,7 @@ const Type* Analyzer::checkBlock(const ast::BlockExpr& block, const Type* expect
   if (diverges != nullptr) {
     *diverges = block_diverges;
   }
+  result_->block_divergence[&block] = block_diverges;
   return result;
 }
 
@@ -119,7 +131,9 @@ const Type* Analyzer::checkLet(const ast::LetStmt& binding, bool* diverges) {
   bool child_diverges = false;
   const Type* value = checkValue(*binding.init, declared, &child_diverges);
   const Type* result = declared != nullptr ? declared : value;
-  scopes_.back().emplace(binding.name, LocalVar{result, binding.is_mutable});
+  LocalVar local{result, binding.is_mutable, &binding};
+  result_->locals[&binding] = local;
+  scopes_.back().emplace(binding.name, local);
   if (diverges != nullptr) {
     *diverges = child_diverges;
   }

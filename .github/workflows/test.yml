@@ -35,7 +35,7 @@ jobs:
       - name: Build rxc
         run: |
           cmake -S . -B target/frontend -DCMAKE_CXX_COMPILER=g++-14 \
-            -DRX_REGENERATE_PARSER=OFF
+            -DRX_REGENERATE_PARSER=OFF -DRX_BUILD_TESTS=ON
           cmake --build target/frontend -j"$(nproc)"
 
       - name: Run frontend tests
@@ -46,3 +46,6 @@ jobs:
 
       - name: Run semantic tests
         run: make test STAGE=semantic BUILD=
+
+      - name: Check semantic results for IR
+        run: ctest --test-dir target/frontend --output-on-failure

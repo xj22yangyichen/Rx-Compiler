@@ -43,6 +43,8 @@ src/
   semantic/
     analyzer.h / .cpp      语义分析入口、声明收集、类型解析与常量求值
     type.h / .cpp          语义类型表示与类型相等判定
+    result.h               供 IR 查询的持久化分析结果
+    record.cpp             表达式类型与隐式调整的记录
     check-stmt.cpp         函数体、块、语句与局部绑定检查
     check-expr.cpp         表达式类型、可变性、调用与类型转换检查
 docs/
@@ -53,6 +55,7 @@ tests/
   official/                官方测试用例（testcases/ 的副本）
   custom/frontend/         自定义的词法 / 语法诊断用例
   custom/ast/              自定义的 AST 结构用例
+  custom/semantic/         分析结果、隐式转换和生命周期的 C++ 测试
 scripts/
   test-frontend.py         前端测试脚本
   test-ast.py              AST 测试脚本
@@ -132,7 +135,7 @@ bad.rx:3:1: parse error: missing ';' at '}'
 ./target/frontend/rxc --stage semantic program.rx
 ```
 
-当前 `semantic` 阶段只要构建出 AST，也会向 stdout 输出 AST JSON，包括随后发现语义错误的情况；程序是否被接受应以退出码为准。语义分析的设计与流程见 [docs/semantic.md](docs/semantic.md)。
+当前 `semantic` 阶段只要构建出 AST，也会向 stdout 输出 AST JSON，包括随后发现语义错误的情况；程序是否被接受应以退出码为准。语义分析成功后，前端还通过 `FrontendResult::semantic` 保存类型、符号绑定、调用目标和隐式转换等结果，供后续 IR 使用。设计、查询接口和生命周期说明见 [docs/semantic.md](docs/semantic.md)。
 
 命令行参数不做校验，只支持上述合法形式。注意源文件不存在时不会报错，而是按空输入处理。
 

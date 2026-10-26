@@ -80,7 +80,8 @@ FrontendResult check(std::istream& source, const std::string& file, Stage stage,
   if (diagnostics.empty() && (stage == Stage::AST || stage == Stage::SEMANTIC)) {
     result.tree = AstBuilder().build_root(tree);
     if (stage == Stage::SEMANTIC) {
-      semantic::analyze(*std::get<std::unique_ptr<ast::Crate>>(*result.tree), file, diagnostics);
+      result.semantic = semantic::analyze(
+        *std::get<std::unique_ptr<ast::Crate>>(*result.tree), file, diagnostics);
     }
   }
   return result;

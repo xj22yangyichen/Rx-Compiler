@@ -35,12 +35,27 @@ std::int64_t parseMagnitude(const std::string& digits, unsigned base) {
 }
 }
 
-void analyze(const ast::Crate& crate, const std::string& file, std::vector<Diagnostic>& diagnostics) {
+std::unique_ptr<AnalysisResult> analyze(const ast::Crate& crate,
+  const std::string& file, std::vector<Diagnostic>& diagnostics) {
   Analyzer analyzer;
-  analyzer.run(crate, file, diagnostics);
+  return analyzer.run(crate, file, diagnostics);
 }
 
-void Analyzer::run(const ast::Crate& crate, const std::string& file, std::vector<Diagnostic>& diagnostics) {
+std::unique_ptr<AnalysisResult> Analyzer::run(const ast::Crate& crate,
+  const std::string& file, std::vector<Diagnostic>& diagnostics) {
+  result_ = std::make_unique<AnalysisResult>();
+  arena_.clear();
+  structs_.clear();
+  functions_.clear();
+  constants_.clear();
+  const_cache_.clear();
+  const_stack_.clear();
+  scopes_.clear();
+  loops_.clear();
+  condition_barriers_.clear();
+  self_struct_ = nullptr;
+  return_type_ = nullptr;
+  current_function_ = nullptr;
   file_ = file;
   diagnostics_ = &diagnostics;
   collectStructs(crate);
@@ -66,6 +81,13 @@ void Analyzer::run(const ast::Crate& crate, const std::string& file, std::vector
       self_struct_ = nullptr;
     }
   }
+  if (!diagnostics.empty()) {
+    return nullptr;
+  }
+  result_->types.swap(arena_);
+  result_->structs = std::move(structs_);
+  result_->constants = std::move(const_cache_);
+  return std::move(result_);
 }
 
 void Analyzer::error(const ast::Span& span, const std::string& message) {
@@ -185,7 +207,7 @@ const Type* Analyzer::resolvePathType(const ast::Path& path) {
 }
 
 const Type* Analyzer::resolveType(const ast::Type& type) {
-  return std::visit([&](const auto& value) -> const Type* {
+  const Type* resolved = std::visit([&](const auto& value) -> const Type* {
     using Node = std::decay_t<decltype(value)>;
     if constexpr (std::is_same_v<Node, ast::PathType>) {
       return resolvePathType(value.path);
@@ -211,6 +233,8 @@ const Type* Analyzer::resolveType(const ast::Type& type) {
       return arrayType(element, static_cast<std::size_t>(length->value));
     }
   }, type.value);
+  result_->resolved_types[&type] = resolved;
+  return resolved;
 }
 
 void Analyzer::collectStructs(const ast::Crate& crate) {
@@ -311,6 +335,7 @@ void Analyzer::collectImpls(const ast::Crate& crate) {
       continue;
     }
     StructInfo& info = found->second;
+    result_->resolved_types[impl->type.get()] = structType(info);
     for (const auto& member : impl->items) {
       if (const auto* function = std::get_if<ast::FunctionItem>(&member->value)) {
         if (info.functions.count(function->name) || info.constants.count(function->name)) {
@@ -575,7 +600,7 @@ const ast::ConstItem* Analyzer::resolveConstantPath(const ast::Path& path) {
 }
 
 std::optional<ConstValue> Analyzer::evalConst(const ast::Expr& expression, const Type* expected) {
-  return std::visit([&](const auto& value) -> std::optional<ConstValue> {
+  auto evaluated = std::visit([&](const auto& value) -> std::optional<ConstValue> {
     using Node = std::decay_t<decltype(value)>;
     if constexpr (std::is_same_v<Node, ast::IntegerExpr>) {
       const Type* type = nullptr;
@@ -599,6 +624,7 @@ std::optional<ConstValue> Analyzer::evalConst(const ast::Expr& expression, const
         error(expression.span, "a constant context requires a constant path");
         return std::nullopt;
       }
+      result_->bindings[&value] = item;
       const ConstValue* resolved = constantValue(*item);
       if (resolved == nullptr) {
         return std::nullopt;
@@ -623,6 +649,11 @@ std::optional<ConstValue> Analyzer::evalConst(const ast::Expr& expression, const
       return std::nullopt;
     }
   }, expression.value);
+  if (evaluated.has_value()) {
+    result_->constant_expressions[&expression] = *evaluated;
+    result_->expressions[&expression].type = evaluated->type;
+  }
+  return evaluated;
 }
 
 const ConstValue* Analyzer::constantValue(const ast::ConstItem& item) {

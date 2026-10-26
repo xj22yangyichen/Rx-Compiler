@@ -56,9 +56,19 @@ add_library(rx_frontend STATIC
   src/frontend/error-listener.cpp src/frontend/frontend.cpp
   src/frontend/ast-builder.cpp
   src/semantic/analyzer.cpp src/semantic/type.cpp
-  src/semantic/check-stmt.cpp src/semantic/check-expr.cpp)
+  src/semantic/check-stmt.cpp src/semantic/check-expr.cpp
+  src/semantic/record.cpp)
 target_link_libraries(rx_frontend PUBLIC rx_parser)
 target_compile_options(rx_frontend PRIVATE -Wall -Wextra -Wpedantic)
 add_executable(rxc src/main.cpp)
 target_link_libraries(rxc PRIVATE rx_frontend)
 target_compile_options(rxc PRIVATE -Wall -Wextra -Wpedantic)
+
+option(RX_BUILD_TESTS "Build semantic result tests" OFF)
+if(RX_BUILD_TESTS)
+  enable_testing()
+  add_executable(semantic-result-test tests/custom/semantic/result-test.cpp)
+  target_link_libraries(semantic-result-test PRIVATE rx_frontend)
+  target_compile_options(semantic-result-test PRIVATE -Wall -Wextra -Wpedantic)
+  add_test(NAME semantic-result COMMAND semantic-result-test)
+endif()

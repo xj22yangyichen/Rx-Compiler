@@ -13,6 +13,8 @@
 | [analyzer.h](../src/semantic/analyzer.h) | `Analyzer`、符号信息、位置和循环上下文各种信息的声明 |
 | [analyzer.cpp](../src/semantic/analyzer.cpp) | 分析入口、声明收集、类型解析、派生与布局检查、常量求值 |
 | [type.h](../src/semantic/type.h)、[type.cpp](../src/semantic/type.cpp) | 辅助工具，包括语义类型表示、整数类型、类型相同的判定 |
+| [result.h](../src/semantic/result.h) | 供 IR 查询的持久化分析结果、符号绑定和调用信息 |
+| [record.cpp](../src/semantic/record.cpp) | 保存表达式类型、隐式转换和方法接收者调整 |
 | [check-stmt.cpp](../src/semantic/check-stmt.cpp) | 函数体、块、语句、`let` 等的处理 |
 | [check-expr.cpp](../src/semantic/check-expr.cpp) | 表达式类型、位置分析、调用、类型转换和公共类型计算 |
 
@@ -22,7 +24,7 @@
 ./target/frontend/rxc --stage semantic program.rx
 ```
 
-构建好 `AST` 后，调用 `semantic::analyze(crate, file, diagnostics)`，创建一个 `Analyzer`，调用其 `run` 方法。
+构建好 `AST` 后，调用 `semantic::analyze(crate, file, diagnostics)`，创建一个 `Analyzer`，调用其 `run` 方法。检查成功时返回 `AnalysisResult`，由 `FrontendResult::semantic` 持有；有诊断时返回空指针，避免 IR 使用不完整的分析结果。
 
 错误通过前一阶段实现的 `Diagnostic` 记录，由 `main` 输出到 stderr。无错误时退出码为 0，有为 1。
 
@@ -60,7 +62,7 @@
 后者支持四种整数、`bool`、unit、never、数组、引用、`Box`、`Vec` 和结构体。
 引用或容器通过 `target` 指向内部类型，数组另存长度，结构体保存声明指针。
 
-类型对象由 `Analyzer::arena_` 中的 `std::deque<Type>` 持有。
+分析期间，类型对象由 `Analyzer::arena_` 中的 `std::deque<Type>` 持有。成功后用 `swap` 将类型池移交给 `AnalysisResult::types`，保持所有类型指针有效。
 分析过程中传递 `const Type*`；类型相等由 `sameType` 递归比较结构，遇到结构体时比较声明身份。
 
 `checkExpr(expression, expected)` 接收可选的期望类型，并返回表达式类型。
@@ -120,5 +122,36 @@ make test STAGE=semantic
 
 测试框架先构建 `rxc`，再根据每个用例的 `compilation_success` 检查退出码。
 
-当前语义分析读取 AST 并收集诊断，没有把推导类型写回 AST，也没有导出持久化类型表。
-类型对象随本次 `Analyzer` 销毁。后续 IR 阶段若要复用类型和名字解析结果，需要增加生命周期覆盖代码生成阶段的分析结果结构。
+新增的结果测试检查生命周期、遮蔽后的绑定、`Self`、字段序号、常量求值、调用目标、隐式转换和循环跳转，CI 同样运行：
+
+```sh
+cmake -S . -B target/frontend -DRX_BUILD_TESTS=ON
+cmake --build target/frontend -j2
+ctest --test-dir target/frontend --output-on-failure
+```
+
+## 给 IR 的分析结果
+
+语义分析不修改 AST，在原有检查过程中把决定保存到 `AnalysisResult` 的旁表中。IR 同时读取 AST 和这些表，不必重新解析名字、推断类型或选择方法。
+
+表的键是 AST 节点地址。必须让 AST 和分析结果一起存活，分析后不能替换节点或重新分配声明列表。移动 `FrontendResult` 不会移动由 `unique_ptr` 持有的 AST 节点，也不会移动类型池。`AnalysisResult` 禁止复制，避免复制后内部指针仍引用旧对象。
+
+隐式调整用 `DEREFERENCE`、`BORROW`、`BORROW_MUT`、`NEVER` 表示，每一步保存调整后的类型。例如 `&Box<i32>` 转成 `&i32`，步骤为解引用到 `Box<i32>`、解引用到 `i32`、共享借用为 `&i32`。数组元素、分支和 `break` 值的公共类型转换也会保存。
+
+生成 IR 时，先生成子表达式，再生成当前表达式，最后依次应用当前表达式的 `adjustments`。块的类型已经包含尾表达式的调整，不能再次应用尾表达式的转换。方法调用另在接收者上应用 `receiver_adjustments`，之后调用 `function` 或按 `builtin` 生成内建操作。
+
+函数路径只作为被调用者使用，不属于值表达式，因此查询 `calls`，而不是要求它在 `expressions` 或 `bindings` 中有值类型。显式 `as`、`*` 和 `&` 仍由 AST 表达，调整表只存隐式操作。
+
+使用入口：
+
+```cpp
+auto frontend = rx::check(source, file, rx::Stage::SEMANTIC);
+if (frontend.semantic != nullptr) {
+  const auto& analysis = *frontend.semantic;
+  const auto& crate =
+    *std::get<std::unique_ptr<rx::ast::Crate>>(*frontend.tree);
+  // IR 生成器接收 crate 和 analysis。
+}
+```
+
+这里只增加 semantic 与 IR 之间的数据接口。基本块、临时值、目标平台的大小与对齐、ABI 和 LLVM 指令仍由后续 IR 实现；字段序号不是内存字节偏移。
